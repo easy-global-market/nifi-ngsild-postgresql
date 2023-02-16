@@ -305,7 +305,7 @@ public class PostgreSQLBackend {
                     break;
                 case "db-by-entity-type":
                     if (attributeTableName != null)
-                        tableName = NGSICharsets.encodePostgreSQL(entityType) + CommonConstants.OLD_CONCATENATOR + attributeTableName;
+                        tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + attributeTableName;
                     else tableName = NGSICharsets.encodePostgreSQL(entityType);
                     break;
                 default:
@@ -318,7 +318,7 @@ public class PostgreSQLBackend {
                     break;
                 case "db-by-entity-type":
                     if (attributeTableName != null)
-                        tableName = NGSICharsets.encodePostgreSQL(entityType) + CommonConstants.OLD_CONCATENATOR + attributeTableName;
+                        tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + attributeTableName;
                     else tableName = NGSICharsets.encodePostgreSQL(entityType);
                     break;
                 default:

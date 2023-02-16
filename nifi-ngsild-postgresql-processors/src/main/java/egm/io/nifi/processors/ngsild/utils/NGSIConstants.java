@@ -10,6 +10,8 @@ public final class NGSIConstants {
     // NGSIPostgreSQLSink specific constants
     // http://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     public static final int POSTGRESQL_MAX_NAME_LEN = 63;
+    public static final String OLD_CONCATENATOR = "_";
+
     public enum POSTGRESQL_COLUMN_TYPES {
         TEXT,
         TIMESTAMPTZ,
