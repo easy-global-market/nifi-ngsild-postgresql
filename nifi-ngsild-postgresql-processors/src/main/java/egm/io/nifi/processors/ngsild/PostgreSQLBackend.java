@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -27,15 +26,15 @@ public class PostgreSQLBackend {
     public Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields(Entity entity, String datasetIdPrefixToTruncate) {
         Map<String, POSTGRESQL_COLUMN_TYPES> aggregation = new TreeMap<>();
 
-        Map<String, List<AttributesLD>> attributesByObservedAt = entity.getEntityAttrsLD().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+        Map<String, List<Attributes>> attributesByObservedAt = entity.getEntityAttrsLD().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
 
         aggregation.putIfAbsent(NGSIConstants.RECV_TIME, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
         aggregation.putIfAbsent(NGSIConstants.ENTITY_ID, POSTGRESQL_COLUMN_TYPES.TEXT);
         aggregation.putIfAbsent(NGSIConstants.ENTITY_TYPE, POSTGRESQL_COLUMN_TYPES.TEXT);
 
-        List<AttributesLD> attributesLDS = new ArrayList<>();
-        attributesByObservedAt.forEach((timestamp, attributesLd) -> attributesLDS.addAll(attributesLd));
-        for (AttributesLD attribute : attributesLDS) {
+        List<Attributes> attributes = new ArrayList<>();
+        attributesByObservedAt.forEach((timestamp, attributesLd) -> attributes.addAll(attributesLd));
+        for (Attributes attribute : attributes) {
             String attrName = encodeAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), datasetIdPrefixToTruncate);
             if (isValidDate(attribute.getAttrValue().toString()))
                 aggregation.putIfAbsent(attrName, POSTGRESQL_COLUMN_TYPES.DATE);
@@ -75,7 +74,7 @@ public class PostgreSQLBackend {
             }
 
             if (attribute.isHasSubAttrs()) {
-                for (AttributesLD subAttribute : attribute.getSubAttrs()) {
+                for (Attributes subAttribute : attribute.getSubAttrs()) {
                     String subAttrName = subAttribute.getAttrName();
                     String encodedSubAttrName = encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttrName, datasetIdPrefixToTruncate);
                     if ("observedAt".equals(subAttrName))
@@ -114,7 +113,7 @@ public class PostgreSQLBackend {
         List<String> valuesForInsertList = new ArrayList<>();
         Map<String, String> valuesForColumns = new TreeMap<>();
         int i = 0;
-        Map<String, List<AttributesLD>> attributesByObservedAt = entity.getEntityAttrsLD().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+        Map<String, List<Attributes>> attributesByObservedAt = entity.getEntityAttrsLD().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         List<String> observedTimestamps = attributesByObservedAt.keySet().stream().sorted().collect(Collectors.toList());
         String oldestTimeStamp;
 
@@ -149,7 +148,7 @@ public class PostgreSQLBackend {
                     }
                     valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
                 }*/
-            for (AttributesLD attribute : attributesByObservedAt.get(observedTimestamp)) {
+            for (Attributes attribute : attributesByObservedAt.get(observedTimestamp)) {
                 valuesForColumns.putAll(insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields, creationTime, datasetIdPrefixToTruncate));
             }
             List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
@@ -163,7 +162,7 @@ public class PostgreSQLBackend {
     }
 
 
-    private Map<String, String> insertAttributesValues(AttributesLD attribute, Map<String, String> valuesForColumns, Entity entity, String oldestTimeStamp, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields, long creationTime, String datasetIdPrefixToTruncate) {
+    private Map<String, String> insertAttributesValues(Attributes attribute, Map<String, String> valuesForColumns, Entity entity, String oldestTimeStamp, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields, long creationTime, String datasetIdPrefixToTruncate) {
         ZonedDateTime creationDate = Instant.ofEpochMilli(creationTime).atZone(ZoneOffset.UTC);
         valuesForColumns.put(NGSIConstants.RECV_TIME, "'" + DateTimeFormatter.ISO_INSTANT.format(creationDate) + "'");
 
@@ -220,7 +219,7 @@ public class PostgreSQLBackend {
         }
 
         if (attribute.isHasSubAttrs()) {
-            for (AttributesLD subAttribute : attribute.getSubAttrs()) {
+            for (Attributes subAttribute : attribute.getSubAttrs()) {
                 String encodedSubAttributeName = encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttribute.getAttrName(), datasetIdPrefixToTruncate);
                 valuesForColumns.put(encodedSubAttributeName, formatFieldForValueInsert(subAttribute.getAttrValue(), listOfFields.get(encodedSubAttributeName)));
             }

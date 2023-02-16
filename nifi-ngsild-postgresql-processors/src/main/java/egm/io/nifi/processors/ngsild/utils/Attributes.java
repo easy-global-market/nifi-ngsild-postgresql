@@ -5,55 +5,65 @@ import java.util.ArrayList;
 public class Attributes {
     public String attrName;
     public String attrType;
-    public String attrValue;
-    public ArrayList<Metadata> attrMetadata;
-    public String metadataString;
+    public Object attrValue;
+    public String datasetId;
 
-    public String getMetadataString() {
-        return metadataString;
+    public String observedAt;
+
+    public String createdAt;
+
+    public String modifiedAt;
+
+    public String getObservedAt() {
+        return observedAt;
     }
 
-    public void setMetadataString(String metadataString) {
-        this.metadataString = metadataString;
+    public boolean hasSubAttrs;
+    public ArrayList<Attributes> subAttrs;
+
+    public boolean isHasSubAttrs() {
+        return hasSubAttrs;
+    }
+
+    public ArrayList<Attributes> getSubAttrs() {
+        return subAttrs;
     }
 
     public String getAttrName() {
         return attrName;
     }
 
-    public void setAttrName(String attrName) {
-        this.attrName = attrName;
-    }
-
     public String getAttrType() {
         return attrType;
     }
 
-    public ArrayList<Metadata> getAttrMetadata() {
-        return attrMetadata;
-    }
-
-    public void setAttrMetadata(ArrayList<Metadata> attrMetadata) {
-        this.attrMetadata = attrMetadata;
-    }
-
-    public void setAttrType(String attrType) {
-        this.attrType = attrType;
-    }
-
-    public String getAttrValue() {
+    public Object getAttrValue() {
         return attrValue;
     }
 
-    public void setAttrValue(String attrValue) {
-        this.attrValue = attrValue;
+    public String getDatasetId() {
+        return datasetId;
     }
 
-    public Attributes(String attrName, String attrType, String attrValue, ArrayList<Metadata> attrMetadata,String metadataString) {
+    public Attributes(
+            String attrName,
+            String attrType,
+            String datasetId,
+            String observedAt,
+            String createdAt,
+            String modifiedAt,
+            Object attrValue,
+            boolean hasSubAttrs,
+            ArrayList<Attributes> subAttrs
+    ) {
         this.attrName = attrName;
         this.attrType = attrType;
+        this.datasetId = datasetId;
+        this.observedAt = observedAt;
+        this.createdAt = createdAt;
+        this.modifiedAt = modifiedAt;
         this.attrValue = attrValue;
-        this.attrMetadata = attrMetadata;
-        this.metadataString = metadataString;
+        this.hasSubAttrs = hasSubAttrs;
+        this.subAttrs= subAttrs;
     }
 }

@@ -5,15 +5,15 @@ import java.util.ArrayList;
 public class Entity {
     public String entityId;
     public String entityType;
-    public ArrayList<AttributesLD> entityAttrsLD;
+    public ArrayList<Attributes> entityAttrsLD;
 
-    public Entity(String entityId, String entityType, ArrayList<AttributesLD> entityAttrsLD) {
+    public Entity(String entityId, String entityType, ArrayList<Attributes> entityAttrsLD) {
         this.entityId = entityId;
         this.entityType = entityType;
         this.entityAttrsLD = entityAttrsLD;
     }
 
-    public ArrayList<AttributesLD> getEntityAttrsLD() {
+    public ArrayList<Attributes> getEntityAttrsLD() {
         return entityAttrsLD;
     }
 

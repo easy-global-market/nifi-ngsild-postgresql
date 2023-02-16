@@ -1,6 +1,6 @@
 package egm.io.nifi.processors.ngsild;
 
-import egm.io.nifi.processors.ngsild.utils.AttributesLD;
+import egm.io.nifi.processors.ngsild.utils.Attributes;
 import egm.io.nifi.processors.ngsild.utils.Entity;
 import egm.io.nifi.processors.ngsild.utils.NGSIConstants;
 import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES;
@@ -157,8 +157,8 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[PostgreSQLBackend.listOfFields ]"
                 + "-------- When attrPersistence is column");
 
-        ArrayList<AttributesLD> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new AttributesLD("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        ArrayList<Attributes> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attributes("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
         Entity entity = new Entity("someId", "someType", entityAttrs);
 
         try {
@@ -188,8 +188,8 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[PostgreSQLBackend.getValuesForInsert]"
                 + "-------- When attrPersistence is column");
 
-        ArrayList<AttributesLD> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new AttributesLD("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        ArrayList<Attributes> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attributes("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
         Entity entity = new Entity("someId", "someType", entityAttrs);
         long creationTime = 1562561734983L;
 

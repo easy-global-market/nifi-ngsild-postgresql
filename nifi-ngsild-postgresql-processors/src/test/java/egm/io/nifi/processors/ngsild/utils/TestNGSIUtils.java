@@ -43,8 +43,8 @@ public class TestNGSIUtils {
         ArrayList<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
         assertEquals(2, entities.size());
 
-        ArrayList<AttributesLD> attributes = entities.get(0).entityAttrsLD;
-        Map<String, List<AttributesLD>> attributesByObservedAt = attributes.stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+        ArrayList<Attributes> attributes = entities.get(0).entityAttrsLD;
+        Map<String, List<Attributes>> attributesByObservedAt = attributes.stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         assertEquals(3, attributesByObservedAt.size());
     }
 
