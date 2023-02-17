@@ -117,46 +117,29 @@ public class PostgreSQLBackend {
             Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
             long creationTime,
             String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs) {
+            Boolean exportSysAttrs,
+            Boolean ignoreEmptyObservedAt
+    ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
         Map<String, String> valuesForColumns = new TreeMap<>();
         Map<String, List<Attribute>> attributesByObservedAt =
                 entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
-        List<String> observedTimestamps = attributesByObservedAt.keySet().stream().sorted().collect(Collectors.toList());
-        String oldestTimeStamp;
+        List<String> observedTimestamps =
+                attributesByObservedAt.keySet().stream()
+                        .sorted()
+                        .collect(Collectors.toList());
 
+        String oldestTimeStamp;
         if (observedTimestamps.get(0).equals("")) {
-            if (observedTimestamps.size() > 1) oldestTimeStamp = observedTimestamps.get(1);
+            if (observedTimestamps.size() > 1)
+                oldestTimeStamp = observedTimestamps.get(1);
             else
                 oldestTimeStamp = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(creationTime).atZone(ZoneOffset.UTC));
-        } else oldestTimeStamp = observedTimestamps.get(0);
+        } else
+            oldestTimeStamp = observedTimestamps.get(0);
 
         for (String observedTimestamp : observedTimestamps) {
-            //unobserved attributes are grouped by modifiedAt timeproperty and add to columns
-                /*if(observedTimestamp.equals("")){
-                    Map<String, List<AttributesLD>> attributesByModifiedAt = attributesByObservedAt.get(observedTimestamp).stream().collect(Collectors.groupingBy(attrs -> attrs.modifiedAt));
-                    List<String> modifiedTimestamps = attributesByModifiedAt.keySet().stream().sorted().collect(Collectors.toList());
-                    for(String modifiedTimestamp: modifiedTimestamps){
-                        for (AttributesLD attribute : attributesByModifiedAt.get(modifiedTimestamp)){
-                            valuesForColumns.putAll(insertAttributesValues(attribute,valuesForColumns, entity, oldestTimeStamp, listOfFields, creationTime, datasetIdPrefixToTruncate));
-                        }
-                        List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
-                        for (String s : listofEncodedName) {
-                            valuesForColumns.putIfAbsent(s, null);
-                        }
-                        valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
-                    }
-                }else {
-                    for (AttributesLD attribute : attributesByObservedAt.get(observedTimestamp)) {
-                        valuesForColumns.putAll(insertAttributesValues(attribute,valuesForColumns, entity, oldestTimeStamp, listOfFields, creationTime, datasetIdPrefixToTruncate));
-                    }
-                    List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
-                    for (String s : listofEncodedName) {
-                        valuesForColumns.putIfAbsent(s, null);
-                    }
-                    valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
-                }*/
             for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
                 Map<String, String> attributesValues =
                         insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
@@ -167,7 +150,10 @@ public class PostgreSQLBackend {
             for (String s : listofEncodedName) {
                 valuesForColumns.putIfAbsent(s, null);
             }
-            valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
+            boolean hasObservations = valuesForColumns.entrySet().stream().anyMatch(entry ->
+                    entry.getKey().endsWith("observedat") && entry.getValue() != null);
+            if (hasObservations || !ignoreEmptyObservedAt)
+                valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
         }
 
         return valuesForInsertList;
@@ -364,8 +350,10 @@ public class PostgreSQLBackend {
             String tableName,
             Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
             String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs) {
-        List<String> valuesForInsert = this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+            Boolean exportSysAttrs,
+            Boolean ignoreEmptyObservedAt) {
+        List<String> valuesForInsert =
+                this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt);
 
         return "insert into " + schemaName + "." + tableName + " " + this.getFieldsForInsert(listOfFields.keySet()) + " values " + String.join(",", valuesForInsert) + ";";
     }

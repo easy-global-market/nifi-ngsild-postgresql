@@ -105,6 +105,15 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             .defaultValue("false")
             .build();
 
+    protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
+            .name("ignore-empty-observed-at")
+            .displayName("Ignore empty observed at lines")
+            .description("true or false, true for ignoring rows without any observation date.")
+            .required(false)
+            .allowableValues("true", "false")
+            .defaultValue("true")
+            .build();
+
     protected static final PropertyDescriptor TRANSACTION_TIMEOUT = new PropertyDescriptor.Builder()
             .name("Transaction Timeout")
             .description("If the <Support Fragmented Transactions> property is set to true, specifies how long to wait for all FlowFiles for a particular fragment.identifier attribute "
@@ -150,6 +159,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(ENABLE_ENCODING);
         properties.add(ENABLE_LOWERCASE);
         properties.add(EXPORT_SYSATTRS);
+        properties.add(IGNORE_EMPTY_OBSERVED_AT);
         properties.add(BATCH_SIZE);
         properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
         return properties;
@@ -267,7 +277,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                                     tableName,
                                     updatedListOfTypedFields,
                                     context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                                    context.getProperty(EXPORT_SYSATTRS).asBoolean()
+                                    context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                                    context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean()
                             );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.

@@ -195,7 +195,7 @@ public class TestNgsiLdToPostgreSQL {
 
         try {
             Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false);
-            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false);
+            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
             List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
            
             try {
