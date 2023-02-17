@@ -66,6 +66,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             .description("Default NGSI-LD Tenant for building the database name")
             .required(false)
             .defaultValue("")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
     protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
