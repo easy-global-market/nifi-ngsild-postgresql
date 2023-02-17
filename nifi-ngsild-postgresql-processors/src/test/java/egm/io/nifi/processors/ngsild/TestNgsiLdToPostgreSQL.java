@@ -1,6 +1,6 @@
 package egm.io.nifi.processors.ngsild;
 
-import egm.io.nifi.processors.ngsild.utils.Attributes;
+import egm.io.nifi.processors.ngsild.utils.Attribute;
 import egm.io.nifi.processors.ngsild.utils.Entity;
 import egm.io.nifi.processors.ngsild.utils.NGSIConstants;
 import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES;
@@ -20,19 +20,19 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
 @RunWith(JUnit4.class)
-public class TestNGSIToPostgreSQL {
+public class TestNgsiLdToPostgreSQL {
     private TestRunner runner;
     private PostgreSQLBackend backend;
 
     @Before
     public void setUp() {
         //Mock the DBCP Controller Service, so we can control the Results
-        runner = TestRunners.newTestRunner(NGSIToPostgreSQL.class);
-        runner.setProperty(NGSIToPostgreSQL.CONNECTION_POOL, "dbcp");
-        runner.setProperty(NGSIToPostgreSQL.DATA_MODEL, "db-by-entity-type");
-        runner.setProperty(NGSIToPostgreSQL.ENABLE_ENCODING, "false");
-        runner.setProperty(NGSIToPostgreSQL.ENABLE_LOWERCASE, "false");
-        runner.setProperty(NGSIToPostgreSQL.BATCH_SIZE, "100");
+        runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
+        runner.setProperty(NgsiLdToPostgreSQL.CONNECTION_POOL, "dbcp");
+        runner.setProperty(NgsiLdToPostgreSQL.DATA_MODEL, "db-by-entity-type");
+        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
+        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE, "false");
+        runner.setProperty(NgsiLdToPostgreSQL.BATCH_SIZE, "100");
         runner.setProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE, "false");
         backend = new PostgreSQLBackend();
     }
@@ -45,8 +45,8 @@ public class TestNGSIToPostgreSQL {
     public void testBuildDBNameOldEncoding() throws Exception {
         System.out.println("[NGSIToPostgreSQL.buildDBName]"
                 + "-------- The schema name is equals to the encoding of the notified/defaulted service");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_LOWERCASE).asBoolean(); // default
+        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
+        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean(); // default
         String service = "someService";
 
         try {
@@ -79,9 +79,9 @@ public class TestNGSIToPostgreSQL {
                 + "-------- The schema name is equals to the encoding of the notified/defaulted service");
 
         String service = "someService";
-        runner.setProperty(NGSIToPostgreSQL.ENABLE_ENCODING, "true");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
+        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "true");
+        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
+        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
 
 
         try {
@@ -112,9 +112,9 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
                 + "-------- A schema name length greater than 63 characters is detected");
 
-        runner.setProperty(NGSIToPostgreSQL.ENABLE_ENCODING, "false");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
+        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
+        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
+        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
         String service = "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongService";
 
         try {
@@ -136,11 +136,11 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[NGSIToPostgreSQL.buildTableName]"
                 + "-------- When data model is by entity, a table name length greater than 63 characters is truncated");
 
-        runner.setProperty(NGSIToPostgreSQL.DATA_MODEL, "db-by-entity");
-        runner.setProperty(NGSIToPostgreSQL.ENABLE_ENCODING, "false");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NGSIToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
-        String dataModel = runner.getProcessContext().getProperty(NGSIToPostgreSQL.DATA_MODEL).getValue();
+        runner.setProperty(NgsiLdToPostgreSQL.DATA_MODEL, "db-by-entity");
+        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
+        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
+        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
+        String dataModel = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.DATA_MODEL).getValue();
         Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType",null);
 
         try {
@@ -157,12 +157,12 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[PostgreSQLBackend.listOfFields ]"
                 + "-------- When attrPersistence is column");
 
-        ArrayList<Attributes> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attributes("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        ArrayList<Attribute> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
         Entity entity = new Entity("someId", "someType", entityAttrs);
 
         try {
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity,"");
+            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity,"", false);
             List<String> expList = Arrays.asList("entityId", "entityType", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
             Set<String> expectedListOfFields = new HashSet<>(expList);
 
@@ -188,14 +188,14 @@ public class TestNGSIToPostgreSQL {
         System.out.println("[PostgreSQLBackend.getValuesForInsert]"
                 + "-------- When attrPersistence is column");
 
-        ArrayList<Attributes> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attributes("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        ArrayList<Attribute> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
         Entity entity = new Entity("someId", "someType", entityAttrs);
         long creationTime = 1562561734983L;
 
         try {
-            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "");
-            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "");
+            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false);
+            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false);
             List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
            
             try {

@@ -43,8 +43,8 @@ public class TestNGSIUtils {
         ArrayList<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
         assertEquals(2, entities.size());
 
-        ArrayList<Attributes> attributes = entities.get(0).entityAttrsLD;
-        Map<String, List<Attributes>> attributesByObservedAt = attributes.stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+        ArrayList<Attribute> attributes = entities.get(0).entityAttrs;
+        Map<String, List<Attribute>> attributesByObservedAt = attributes.stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         assertEquals(3, attributesByObservedAt.size());
     }
 
@@ -54,7 +54,7 @@ public class TestNGSIUtils {
         ArrayList<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
         assertTrue(
                 entities.stream().allMatch(
-                        entity -> entity.entityAttrsLD.stream()
+                        entity -> entity.entityAttrs.stream()
                                 .allMatch(attributes ->
                                         !Objects.equals(attributes.attrName, "nullValue") &&
                                             !Objects.equals(attributes.attrName, "nullAttribute")

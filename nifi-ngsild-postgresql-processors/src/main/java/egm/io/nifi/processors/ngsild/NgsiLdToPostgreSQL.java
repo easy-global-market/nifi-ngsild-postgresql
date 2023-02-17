@@ -32,14 +32,14 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 
 @SupportsBatching
 @InputRequirement(Requirement.INPUT_REQUIRED)
-@Tags({"Postgresql","sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI", "NGSI-LD", "FIWARE"})
-@CapabilityDescription("Create a database if not exists using the information coming from an NGSI event converted to flow file." +
+@Tags({"Postgresql","sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI-LD", "FIWARE"})
+@CapabilityDescription("Create a database if not exists using the information coming from an NGSI-LD event converted to flow file." +
         "After insert all of the vales of the flow file content extraction the entities and attributes")
 @WritesAttributes({
         @WritesAttribute(attribute = "sql.generated.key", description = "If the database generated a key for an INSERT statement and the Obtain Generated Keys property is set to true, "
                 + "this attribute will be added to indicate the generated key, if possible. This feature is not supported by all database vendors.")
 })
-public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
+public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
             .name("JDBC Connection Pool")
@@ -66,7 +66,6 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
             .description("Default NGSI-LD Tenant for building the database name")
             .required(false)
             .defaultValue("")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
     protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
@@ -94,6 +93,15 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
             .required(false)
             .allowableValues("true", "false")
             .defaultValue("true")
+            .build();
+
+    protected static final PropertyDescriptor EXPORT_SYSATTRS = new PropertyDescriptor.Builder()
+            .name("export-sysattrs")
+            .displayName("Export Sysattrs")
+            .description("true or false, true for exporting the sys attributes of entities and attributes.")
+            .required(false)
+            .allowableValues("true", "false")
+            .defaultValue("false")
             .build();
 
     protected static final PropertyDescriptor TRANSACTION_TIMEOUT = new PropertyDescriptor.Builder()
@@ -140,6 +148,7 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(DATASETID_PREFIX_TRUNCATE);
         properties.add(ENABLE_ENCODING);
         properties.add(ENABLE_LOWERCASE);
+        properties.add(EXPORT_SYSATTRS);
         properties.add(BATCH_SIZE);
         properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
         return properties;
@@ -210,9 +219,11 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
             NGSIUtils n = new NGSIUtils();
-            final NGSIEvent event=n.getEventFromFlowFile(flowFile,session);
+            final NGSIEvent event = n.getEventFromFlowFile(flowFile, session);
             final long creationTime = event.getCreationTime();
-            final String ngsiLdTenant = (event.getNgsiLdTenant().compareToIgnoreCase("")==0)?context.getProperty(DEFAULT_TENANT).getValue():event.getNgsiLdTenant();
+            final String ngsiLdTenant =
+                    (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
+                            context.getProperty(DEFAULT_TENANT).getValue() : event.getNgsiLdTenant();
             try {
                 final String schemaName =
                         postgres.buildSchemaName(
@@ -220,8 +231,8 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
                                 context.getProperty(ENABLE_ENCODING).asBoolean(),
                                 context.getProperty(ENABLE_LOWERCASE).asBoolean()
                         );
-                ArrayList<Entity> entities = event.getEntitiesLD();
 
+                ArrayList<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
                     getLogger().info("Exporting entity " + entity.toString());
 
@@ -237,12 +248,13 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
                             postgres.listOfFields(
                                     entity,
-                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue()
+                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
+                                    context.getProperty(EXPORT_SYSATTRS).asBoolean()
                             );
 
-                    ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypesQuery(tableName));
+                    ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypes(tableName));
                     Map<String, POSTGRESQL_COLUMN_TYPES> updatedListOfTypedFields;
-                    if(columnDataType !=null)
+                    if (columnDataType != null)
                         updatedListOfTypedFields = postgres.getUpdatedListOfTypedFields(columnDataType, listOfFields);
                     else updatedListOfTypedFields = listOfFields;
 
@@ -253,7 +265,8 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
                                     schemaName,
                                     tableName,
                                     updatedListOfTypedFields,
-                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue()
+                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
+                                    context.getProperty(EXPORT_SYSATTRS).asBoolean()
                             );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.
@@ -293,10 +306,7 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
     };
 
-    private GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
-
-    };
-
+    private final GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {};
 
     private final PutGroup.GroupFlowFiles<FunctionContext, Connection, StatementFlowFileEnclosure> groupFlowFiles = (context, session, fc, conn, flowFiles, result) -> {
         final Map<String, StatementFlowFileEnclosure> sqlToEnclosure = new HashMap<>();
@@ -413,7 +423,7 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
                 // In the presence of a BatchUpdateException, the driver has the option of either stopping when an error
                 // occurs, or continuing. If it continues, then it must account for all statements in the batch and for
                 // those that fail return a Statement.EXECUTE_FAILED for the number of rows updated.
-                // So we will iterate over all of the update counts returned. If any is equal to Statement.EXECUTE_FAILED,
+                // So we will iterate over all the update counts returned. If any is equal to Statement.EXECUTE_FAILED,
                 // we will route the corresponding FlowFile to failure. Otherwise, the FlowFile will go to success
                 // unless it has not yet been processed (its index in the List > updateCounts.length).
                 int failureCount = 0;
@@ -603,11 +613,11 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     /**
      * Returns the key that was generated from the given statement, or <code>null</code> if no key
-     * was generated or it could not be determined.
+     * was generated, or it could not be determined.
      *
      * @param stmt the statement that generated a key
      * @return the key that was generated from the given statement, or <code>null</code> if no key
-     * was generated or it could not be determined.
+     * was generated, or it could not be determined.
      */
 
     private String determineGeneratedKey(final PreparedStatement stmt) {
@@ -768,7 +778,7 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
             }
 
             if (selectedId.equals(fragmentId)) {
-                // fragment id's match. Find out if we have all of the necessary fragments or not.
+                // fragment id's match. Find out if we have all the necessary fragments or not.
                 final int numFragments;
                 if (fragCount != null && JdbcCommon.NUMBER_PATTERN.matcher(fragCount).matches()) {
                     numFragments = Integer.parseInt(fragCount);
@@ -777,7 +787,7 @@ public class NGSIToPostgreSQL extends AbstractSessionFactoryProcessor {
                 }
 
                 if (numSelected >= numFragments - 1) {
-                    // We have all of the fragments we need for this transaction.
+                    // We have all the fragments we need for this transaction.
                     return FlowFileFilterResult.ACCEPT_AND_TERMINATE;
                 } else {
                     // We still need more fragments for this transaction, so accept this one and continue.

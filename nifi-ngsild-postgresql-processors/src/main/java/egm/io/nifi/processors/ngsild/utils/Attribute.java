@@ -2,16 +2,13 @@ package egm.io.nifi.processors.ngsild.utils;
 
 import java.util.ArrayList;
 
-public class Attributes {
+public class Attribute {
     public String attrName;
     public String attrType;
     public Object attrValue;
     public String datasetId;
-
     public String observedAt;
-
     public String createdAt;
-
     public String modifiedAt;
 
     public String getObservedAt() {
@@ -19,13 +16,13 @@ public class Attributes {
     }
 
     public boolean hasSubAttrs;
-    public ArrayList<Attributes> subAttrs;
+    public ArrayList<Attribute> subAttrs;
 
     public boolean isHasSubAttrs() {
         return hasSubAttrs;
     }
 
-    public ArrayList<Attributes> getSubAttrs() {
+    public ArrayList<Attribute> getSubAttrs() {
         return subAttrs;
     }
 
@@ -45,7 +42,7 @@ public class Attributes {
         return datasetId;
     }
 
-    public Attributes(
+    public Attribute(
             String attrName,
             String attrType,
             String datasetId,
@@ -54,7 +51,7 @@ public class Attributes {
             String modifiedAt,
             Object attrValue,
             boolean hasSubAttrs,
-            ArrayList<Attributes> subAttrs
+            ArrayList<Attribute> subAttrs
     ) {
         this.attrName = attrName;
         this.attrType = attrType;

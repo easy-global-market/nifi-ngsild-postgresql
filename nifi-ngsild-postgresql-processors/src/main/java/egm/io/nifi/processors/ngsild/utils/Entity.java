@@ -5,16 +5,16 @@ import java.util.ArrayList;
 public class Entity {
     public String entityId;
     public String entityType;
-    public ArrayList<Attributes> entityAttrsLD;
+    public ArrayList<Attribute> entityAttrs;
 
-    public Entity(String entityId, String entityType, ArrayList<Attributes> entityAttrsLD) {
+    public Entity(String entityId, String entityType, ArrayList<Attribute> entityAttrs) {
         this.entityId = entityId;
         this.entityType = entityType;
-        this.entityAttrsLD = entityAttrsLD;
+        this.entityAttrs = entityAttrs;
     }
 
-    public ArrayList<Attributes> getEntityAttrsLD() {
-        return entityAttrsLD;
+    public ArrayList<Attribute> getEntityAttrs() {
+        return entityAttrs;
     }
 
     public String getEntityType() {

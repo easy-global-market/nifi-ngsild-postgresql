@@ -5,16 +5,16 @@ import java.util.ArrayList;
 public class NGSIEvent {
     public long creationTime;
     public String ngsiLdTenant;
-    public ArrayList <Entity> entitiesLD;
+    public ArrayList <Entity> entities;
 
-    public NGSIEvent(long creationTime, String ngsiLdTenant, ArrayList<Entity> entitiesLD){
+    public NGSIEvent(long creationTime, String ngsiLdTenant, ArrayList<Entity> entities){
         this.creationTime = creationTime;
         this.ngsiLdTenant = ngsiLdTenant;
-        this.entitiesLD = entitiesLD;
+        this.entities = entities;
     }
 
-    public ArrayList<Entity> getEntitiesLD() {
-        return entitiesLD;
+    public ArrayList<Entity> getEntities() {
+        return entities;
     }
 
     public long getCreationTime() {

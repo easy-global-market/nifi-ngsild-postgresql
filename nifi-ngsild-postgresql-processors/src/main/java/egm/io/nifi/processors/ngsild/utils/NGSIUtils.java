@@ -30,13 +30,12 @@ public class NGSIUtils {
         Map<String, String> newFlowFileAttributes = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         newFlowFileAttributes.putAll(flowFileAttributes);
         final String flowFileContent = new String(buffer, StandardCharsets.UTF_8);
-        String ngsiLdTenant = newFlowFileAttributes.get("ngsild-tenant") == null ? "" : newFlowFileAttributes.get("ngsild-tenant");
+        String ngsiLdTenant = newFlowFileAttributes.get("NGSILD-Tenant") == null ? "" : newFlowFileAttributes.get("NGSILD-Tenant");
         long creationTime = flowFile.getEntryDate();
 
         logger.debug("Received an NGSI-LD notification");
 
         JSONArray content = new JSONArray(flowFileContent);
-        logger.debug("Received an NGSI-LD temporal data");
         ArrayList<Entity> entities = parseNgsiLdEntities(content);
 
         return new NGSIEvent(creationTime, ngsiLdTenant, entities);
@@ -51,7 +50,7 @@ public class NGSIUtils {
             entityId = temporalEntity.getString("id");
             entityType = temporalEntity.getString("type");
             logger.debug("Dealing with entity {} of type {}", entityId, entityType);
-            ArrayList<Attributes> attributes = new ArrayList<>();
+            ArrayList<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
@@ -62,12 +61,12 @@ public class NGSIUtils {
                         JSONArray values = temporalEntity.getJSONArray(key);
                         for (int j = 0; j < values.length(); j++) {
                             JSONObject value = values.getJSONObject(j);
-                            Attributes attributesLD = parseNgsiLdAttribute(key, value);
-                            addAttributeIfValid(attributes, attributesLD);
+                            Attribute attribute = parseNgsiLdAttribute(key, value);
+                            addAttributeIfValid(attributes, attribute);
                         }
                     } else if (object instanceof JSONObject) {
-                        Attributes attributesLD = parseNgsiLdAttribute(key, (JSONObject) object);
-                        addAttributeIfValid(attributes, attributesLD);
+                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object);
+                        addAttributeIfValid(attributes, attribute);
                     } else {
                         logger.warn("Attribute {} has unexpected value type: {}", key, object.getClass());
                     }
@@ -91,8 +90,9 @@ public class NGSIUtils {
         return entities;
     }
 
-    private Attributes parseNgsiLdAttribute(String key, JSONObject value) {
-        //When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification - if it has no history in the specified time range.
+    private Attribute parseNgsiLdAttribute(String key, JSONObject value) {
+        // When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification -
+        // if it has no history in the specified time range.
         // In this case, some flow file can give entity that contains attributes with only null values so attribute type can be set to null
         String attrType = value.optString("type");
         String datasetId = value.optString("datasetId");
@@ -100,7 +100,7 @@ public class NGSIUtils {
         String createdAt = value.optString("createdAt");
         String modifiedAt = value.optString("modifiedAt");
         Object attrValue;
-        ArrayList<Attributes> subAttributes = new ArrayList<>();
+        ArrayList<Attribute> subAttributes = new ArrayList<>();
 
         if ("Relationship".contentEquals(attrType)) {
             attrValue = value.get("object").toString();
@@ -108,7 +108,7 @@ public class NGSIUtils {
             attrValue = value.opt("value");
         } else if ("GeoProperty".contentEquals(attrType)) {
             attrValue = value;
-        } else if("".contentEquals(attrType)){
+        } else if ("".contentEquals(attrType)){
             attrType = null;
             attrValue = null;
         } else {
@@ -121,7 +121,7 @@ public class NGSIUtils {
             String keyOne = keysOneLevel.next();
             if (("Property".equals(attrType) && "unitCode".equals(keyOne))) {
                 if (value.get(keyOne) instanceof String)
-                    subAttributes.add(new Attributes(keyOne.toLowerCase(), "Property", "", "", "", "", value.getString(keyOne), false, null));
+                    subAttributes.add(new Attribute(keyOne.toLowerCase(), "Property", "", "", "", "", value.getString(keyOne), false, null));
 
             } else if ("RelationshipDetails".contains(keyOne)) {
                 JSONObject relation = value.getJSONObject(keyOne);
@@ -135,11 +135,11 @@ public class NGSIUtils {
                         JSONArray valuesArray = relation.getJSONArray(relationKey);
                         for (int j = 0; j < valuesArray.length(); j++) {
                             JSONObject valueObject = valuesArray.getJSONObject(j);
-                            Attributes subAttribute = parseNgsiLdSubAttribute(relationKey, valueObject);
+                            Attribute subAttribute = parseNgsiLdSubAttribute(relationKey, valueObject);
                             addAttributeIfValid(subAttributes, subAttribute);
                         }
                     } else if (object instanceof JSONObject) {
-                        Attributes subAttribute = parseNgsiLdSubAttribute(relationKey, (JSONObject) object);
+                        Attribute subAttribute = parseNgsiLdSubAttribute(relationKey, (JSONObject) object);
                         addAttributeIfValid(subAttributes, subAttribute);
                     } else {
                         logger.warn("Sub Attribute {} has unexpected value type: {}", relationKey, object.getClass());
@@ -151,11 +151,11 @@ public class NGSIUtils {
                     JSONArray valuesArray = value.getJSONArray(keyOne);
                     for (int j = 0; j < valuesArray.length(); j++) {
                         JSONObject valueObject = valuesArray.getJSONObject(j);
-                        Attributes subAttribute = parseNgsiLdSubAttribute(keyOne, valueObject);
+                        Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, valueObject);
                         addAttributeIfValid(subAttributes, subAttribute);
                     }
                 } else if (object instanceof JSONObject) {
-                    Attributes subAttribute = parseNgsiLdSubAttribute(keyOne, value.getJSONObject(keyOne));
+                    Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, value.getJSONObject(keyOne));
                     addAttributeIfValid(subAttributes, subAttribute);
                 } else {
                     logger.warn("Sub Attribute {} has unexpected value type: {}", keyOne, object.getClass());
@@ -163,10 +163,10 @@ public class NGSIUtils {
             }
         }
 
-        return new Attributes(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
+        return new Attribute(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
     }
 
-    private Attributes parseNgsiLdSubAttribute(String key, JSONObject value) {
+    private Attribute parseNgsiLdSubAttribute(String key, JSONObject value) {
         String subAttrType = value.get("type").toString();
         Object subAttrValue = "";
         if ("Relationship".contentEquals(subAttrType)) {
@@ -177,15 +177,18 @@ public class NGSIUtils {
             subAttrValue = value.get("value").toString();
         }
 
-        return new Attributes(key.toLowerCase(), subAttrType, "", "", "", "", subAttrValue, false, null);
+        return new Attribute(key.toLowerCase(), subAttrType, "", "", "", "", subAttrValue, false, null);
     }
 
-    // When this processor is used in a flow with a `Join Enrichment` processor, it harmonizes JSON among all processed entities, for instance adding attributes which are not present by default in an entity.
+    // When this processor is used in a flow with a `Join Enrichment` processor, it harmonizes JSON among all processed entities,
+    // for instance adding attributes which are not present by default in an entity.
     // In this case, these attributes are null or can have a null value.
-    // Moreover, when doing a temporal request, if some attributes have no temporal values, they are still added and they are null
+    // Moreover, when doing a temporal request, if some attributes have no temporal values, they are still added, and they are null
     // So we filter out attributes that contain a null value or whose whole value is null
-    private void addAttributeIfValid(ArrayList<Attributes> attributes, Attributes attributeLD) {
-        if (attributeLD.getAttrValue() !=null && attributeLD.getAttrValue().toString() != "null")
-            attributes.add(attributeLD);
+    private void addAttributeIfValid(ArrayList<Attribute> attributes, Attribute attribute) {
+        if (attribute != null &&
+                attribute.getAttrValue() != null &&
+                !Objects.equals(attribute.getAttrValue().toString(), "null"))
+            attributes.add(attribute);
     }
 }
