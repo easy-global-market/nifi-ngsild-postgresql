@@ -27,6 +27,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnError;
 
@@ -40,6 +41,9 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
                 + "this attribute will be added to indicate the generated key, if possible. This feature is not supported by all database vendors.")
 })
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
+
+    private static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
+    private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
             .name("JDBC Connection Pool")
@@ -226,6 +230,17 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                    final RoutingResult result);
     }
 
+    /**
+     * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
+     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
+     */
+    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
+        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
+        if (ignoredAttributesAttribute == null)
+            return Collections.emptySet();
+        else
+            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
+    }
 
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
@@ -245,7 +260,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
                 ArrayList<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
-                    getLogger().info("Exporting entity " + entity.toString());
+                    getLogger().info("Exporting entity " + entity.entityId);
 
                     String tableName =
                             postgres.buildTableName(
@@ -253,14 +268,15 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                                     context.getProperty(DATA_MODEL).getValue(),
                                     context.getProperty(ENABLE_ENCODING).asBoolean(),
                                     context.getProperty(ENABLE_LOWERCASE).asBoolean(),
-                                    flowFile.getAttribute("TableNameSuffix")
+                                    flowFile.getAttribute(TABLE_NAME_SUFFIX)
                             );
 
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
                             postgres.listOfFields(
                                     entity,
                                     context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                                    context.getProperty(EXPORT_SYSATTRS).asBoolean()
+                                    context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                                    getIgnoredAttributes(flowFile)
                             );
 
                     ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypes(tableName));

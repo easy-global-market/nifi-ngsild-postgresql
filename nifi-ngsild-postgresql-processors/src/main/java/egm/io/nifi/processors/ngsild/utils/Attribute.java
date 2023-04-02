@@ -1,6 +1,6 @@
 package egm.io.nifi.processors.ngsild.utils;
 
-import java.util.ArrayList;
+import java.util.List;
 
 public class Attribute {
     public String attrName;
@@ -16,13 +16,13 @@ public class Attribute {
     }
 
     public boolean hasSubAttrs;
-    public ArrayList<Attribute> subAttrs;
+    public List<Attribute> subAttrs;
 
     public boolean isHasSubAttrs() {
         return hasSubAttrs;
     }
 
-    public ArrayList<Attribute> getSubAttrs() {
+    public List<Attribute> getSubAttrs() {
         return subAttrs;
     }
 
@@ -51,7 +51,7 @@ public class Attribute {
             String modifiedAt,
             Object attrValue,
             boolean hasSubAttrs,
-            ArrayList<Attribute> subAttrs
+            List<Attribute> subAttrs
     ) {
         this.attrName = attrName;
         this.attrType = attrType;

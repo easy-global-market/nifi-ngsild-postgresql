@@ -26,8 +26,8 @@ public class PostgreSQLBackend {
     public Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields(
             Entity entity,
             String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs
-    ) {
+            Boolean exportSysAttrs,
+            Set<String> ignoredAttributes) {
         Map<String, POSTGRESQL_COLUMN_TYPES> aggregation = new TreeMap<>();
 
         Map<String, List<Attribute>> attributesByObservedAt =
@@ -38,7 +38,11 @@ public class PostgreSQLBackend {
         aggregation.put(NGSIConstants.ENTITY_TYPE, POSTGRESQL_COLUMN_TYPES.TEXT);
 
         List<Attribute> attributes = new ArrayList<>();
-        attributesByObservedAt.forEach((timestamp, attributesLd) -> attributes.addAll(attributesLd));
+        attributesByObservedAt.forEach((timestamp, attributesLd) -> attributesLd.forEach(attribute -> {
+            if (!ignoredAttributes.contains(attribute.getAttrName()))
+                attributes.add(attribute);
+        }));
+
         for (Attribute attribute : attributes) {
             String attrName = encodeAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), datasetIdPrefixToTruncate);
             if (isValidDate(attribute.getAttrValue().toString()))
@@ -81,14 +85,16 @@ public class PostgreSQLBackend {
 
             if (attribute.isHasSubAttrs()) {
                 for (Attribute subAttribute : attribute.getSubAttrs()) {
-                    String subAttrName = subAttribute.getAttrName();
-                    String encodedSubAttrName =
-                            encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttrName, datasetIdPrefixToTruncate);
-                    if (subAttribute.getAttrValue() instanceof Number)
-                        aggregation.put(encodedSubAttrName, POSTGRESQL_COLUMN_TYPES.NUMERIC);
-                    else
-                        aggregation.putIfAbsent(encodedSubAttrName, POSTGRESQL_COLUMN_TYPES.TEXT);
-                    logger.debug("Added subattribute {} ({}) to attribute {}", encodedSubAttrName, subAttrName, attrName);
+                    if (!ignoredAttributes.contains(subAttribute.getAttrName())) {
+                        String subAttrName = subAttribute.getAttrName();
+                        String encodedSubAttrName =
+                                encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttrName, datasetIdPrefixToTruncate);
+                        if (subAttribute.getAttrValue() instanceof Number)
+                            aggregation.put(encodedSubAttrName, POSTGRESQL_COLUMN_TYPES.NUMERIC);
+                        else
+                            aggregation.putIfAbsent(encodedSubAttrName, POSTGRESQL_COLUMN_TYPES.TEXT);
+                        logger.debug("Added subattribute {} ({}) to attribute {}", encodedSubAttrName, subAttrName, attrName);
+                    }
                 }
             }
         }
@@ -170,13 +176,16 @@ public class PostgreSQLBackend {
             String datasetIdPrefixToTruncate,
             Boolean exportSysAttrs
     ) {
+        String encodedAttributeName = encodeAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), datasetIdPrefixToTruncate);
+        // some attributes may have been set to be ignored, don't add values for them
+        if (!listOfFields.containsKey(encodedAttributeName))
+            return valuesForColumns;
+
         ZonedDateTime creationDate = Instant.ofEpochMilli(creationTime).atZone(ZoneOffset.UTC);
 
         valuesForColumns.put(NGSIConstants.RECV_TIME, "'" + DateTimeFormatter.ISO_INSTANT.format(creationDate) + "'");
         valuesForColumns.put(NGSIConstants.ENTITY_ID, "'" + entity.getEntityId() + "'");
         valuesForColumns.put(NGSIConstants.ENTITY_TYPE, "'" + entity.getEntityType() + "'");
-
-        String encodedAttributeName = encodeAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), datasetIdPrefixToTruncate);
 
         if ("GeoProperty".equals(attribute.getAttrType())) {
             JSONObject geoProppertyObject = (JSONObject) attribute.getAttrValue();
@@ -230,8 +239,10 @@ public class PostgreSQLBackend {
 
         if (attribute.isHasSubAttrs()) {
             for (Attribute subAttribute : attribute.getSubAttrs()) {
-                String encodedSubAttributeName = encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttribute.getAttrName(), datasetIdPrefixToTruncate);
-                valuesForColumns.put(encodedSubAttributeName, formatFieldForValueInsert(subAttribute.getAttrValue(), listOfFields.get(encodedSubAttributeName)));
+                String encodedSubAttributeName =
+                        encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttribute.getAttrName(), datasetIdPrefixToTruncate);
+                if (listOfFields.containsKey(encodedSubAttributeName))
+                    valuesForColumns.put(encodedSubAttributeName, formatFieldForValueInsert(subAttribute.getAttrValue(), listOfFields.get(encodedSubAttributeName)));
             }
         }
 

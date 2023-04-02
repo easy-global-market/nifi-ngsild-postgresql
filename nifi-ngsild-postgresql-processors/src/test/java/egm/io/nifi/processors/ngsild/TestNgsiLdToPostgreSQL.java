@@ -162,7 +162,7 @@ public class TestNgsiLdToPostgreSQL {
         Entity entity = new Entity("someId", "someType", entityAttrs);
 
         try {
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity,"", false);
+            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity,"", false, Collections.emptySet());
             List<String> expList = Arrays.asList("entityId", "entityType", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
             Set<String> expectedListOfFields = new HashSet<>(expList);
 
@@ -194,7 +194,7 @@ public class TestNgsiLdToPostgreSQL {
         long creationTime = 1562561734983L;
 
         try {
-            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false);
+            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
             List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
             List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
            
@@ -214,6 +214,54 @@ public class TestNgsiLdToPostgreSQL {
         } // try catch
 
     } // testValuesForInsertRowWithMetadata
+
+    @Test
+    public void testIgnoredAttributesForTopLevelAttribute() {
+        ArrayList<Attribute> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        entityAttrs.add(new Attribute("ignoredAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr","anotherIgnoredAttr"));
+        long creationTime = 1562561734983L;
+
+        try {
+            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
+                    backend.listOfFields(entity, "", false, ignoredAttributes);
+            List<String> valuesForInsert =
+                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
+
+            assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredattr")));
+            // values for ignored attribute should not be in the values for insert
+            assertEquals(5, valuesForInsert.get(0).split(",").length);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void testIgnoredAttributesForSubAttribute() {
+        ArrayList<Attribute> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        Attribute subAttribute =
+                new Attribute("ignoredSubAttr", "Property", null, null, null, null, 12.0, false, new ArrayList<>());
+        entityAttrs.add(new Attribute("anotherAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, true, Collections.singletonList(subAttribute)));
+        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr","ignoredSubAttr"));
+        long creationTime = 1562561734983L;
+
+        try {
+            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
+                    backend.listOfFields(entity, "", false, ignoredAttributes);
+            List<String> valuesForInsert =
+                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
+
+            assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredsubattr")));
+            // values for ignored sub-attribute should not be in the values for insert
+            assertEquals(7, valuesForInsert.get(0).split(",").length);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
 
     @Test
     public void shouldChangeTheTypeOfField() throws Exception {
