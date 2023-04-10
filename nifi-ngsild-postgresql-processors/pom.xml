@@ -25,7 +25,7 @@
     <artifactId>nifi-ngsild-postgresql-processors</artifactId>
     <packaging>jar</packaging>
     <properties>
-        <nifi.version>1.16.3</nifi.version>
+        <nifi.version>1.21.0</nifi.version>
     </properties>
 
     <dependencies>
