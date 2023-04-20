@@ -461,8 +461,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     final int updateCount = updateCounts[i];
                     final FlowFile flowFile = batchFlowFiles.get(i);
                     if (updateCount == Statement.EXECUTE_FAILED) {
-                        flowFile.getAttributes().put("NgsiLdToPostgreSQL Error", e.getMessage());
-                        flowFile.getAttributes().put("NgsiLdToPostgreSQL SQL Error", ((BatchUpdateException) e).getSQLState());
                         result.routeTo(flowFile, REL_FAILURE);
                         failureCount++;
                     } else {
@@ -475,8 +473,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     // if no failures found, the driver decided not to execute the statements after the
                     // failure, so route the last one to failure.
                     final FlowFile failedFlowFile = batchFlowFiles.get(updateCounts.length);
-                    failedFlowFile.getAttributes().put("NgsiLdToPostgreSQL Error", e.getMessage());
-                    failedFlowFile.getAttributes().put("NgsiLdToPostgreSQL SQL Error", ((BatchUpdateException) e).getSQLState());
                     result.routeTo(failedFlowFile, REL_FAILURE);
                     failureCount++;
                 }
