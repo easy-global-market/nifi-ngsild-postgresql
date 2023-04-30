@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-
 public class NGSIUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(NGSIUtils.class);
@@ -23,26 +22,21 @@ public class NGSIUtils {
     public NGSIEvent getEventFromFlowFile(FlowFile flowFile, final ProcessSession session) {
 
         final byte[] buffer = new byte[(int) flowFile.getSize()];
-
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
-        // Create the PreparedStatement to use for this FlowFile.
-        Map<String, String> flowFileAttributes = flowFile.getAttributes();
-        Map<String, String> newFlowFileAttributes = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        newFlowFileAttributes.putAll(flowFileAttributes);
         final String flowFileContent = new String(buffer, StandardCharsets.UTF_8);
-        String ngsiLdTenant = newFlowFileAttributes.get("NGSILD-Tenant") == null ? "" : newFlowFileAttributes.get("NGSILD-Tenant");
+
+        Map<String, String> flowFileAttributes = flowFile.getAttributes();
+        String ngsiLdTenant = flowFileAttributes.get("NGSILD-Tenant") == null ? "" : flowFileAttributes.get("NGSILD-Tenant");
         long creationTime = flowFile.getEntryDate();
 
-        logger.debug("Received an NGSI-LD notification");
-
         JSONArray content = new JSONArray(flowFileContent);
-        ArrayList<Entity> entities = parseNgsiLdEntities(content);
+        List<Entity> entities = parseNgsiLdEntities(content);
 
         return new NGSIEvent(creationTime, ngsiLdTenant, entities);
     }
 
-    public ArrayList<Entity> parseNgsiLdEntities(JSONArray content) {
-        ArrayList<Entity> entities = new ArrayList<>();
+    public List<Entity> parseNgsiLdEntities(JSONArray content) {
+        List<Entity> entities = new ArrayList<>();
         String entityType;
         String entityId;
         for (int i = 0; i < content.length(); i++) {
@@ -72,18 +66,6 @@ public class NGSIUtils {
                     }
                 }
             }
-
-//            //here we group the observed and unobserved entities into one
-//            String finalEntityId = entityId;
-//            if(entities.stream().anyMatch(entity -> entity.entityId.equals(finalEntityId))){
-//                for (int x=0;x<entities.size();x++) {
-//                    if (entities.get(x).entityId.equals(finalEntityId)){
-//                        ArrayList<AttributesLD> attributesLDS = entities.get(x).entityAttrsLD;
-//                        attributesLDS.addAll(attributes);
-//                        entities.get(x).setEntityAttrsLD(attributesLDS);
-//                    }
-//                }
-//            } else entities.add(new Entity(entityId,entityType,attributes,true));
 
             entities.add(new Entity(entityId, entityType, attributes));
         }
@@ -122,7 +104,6 @@ public class NGSIUtils {
             if (("Property".equals(attrType) && "unitCode".equals(keyOne))) {
                 if (value.get(keyOne) instanceof String)
                     subAttributes.add(new Attribute(keyOne.toLowerCase(), "Property", "", "", "", "", value.getString(keyOne), false, null));
-
             } else if ("RelationshipDetails".contains(keyOne)) {
                 JSONObject relation = value.getJSONObject(keyOne);
                 relation.remove("id");
@@ -185,7 +166,7 @@ public class NGSIUtils {
     // In this case, these attributes are null or can have a null value.
     // Moreover, when doing a temporal request, if some attributes have no temporal values, they are still added, and they are null
     // So we filter out attributes that contain a null value or whose whole value is null
-    private void addAttributeIfValid(ArrayList<Attribute> attributes, Attribute attribute) {
+    private void addAttributeIfValid(List<Attribute> attributes, Attribute attribute) {
         if (attribute != null &&
                 attribute.getAttrValue() != null &&
                 !Objects.equals(attribute.getAttrValue().toString(), "null"))

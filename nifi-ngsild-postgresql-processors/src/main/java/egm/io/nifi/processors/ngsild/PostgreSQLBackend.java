@@ -165,7 +165,6 @@ public class PostgreSQLBackend {
         return valuesForInsertList;
     }
 
-
     private Map<String, String> insertAttributesValues(
             Attribute attribute,
             Map<String, String> valuesForColumns,
@@ -248,7 +247,6 @@ public class PostgreSQLBackend {
 
         return valuesForColumns;
     }
-
 
     private String formatFieldForValueInsert(Object attributeValue, POSTGRESQL_COLUMN_TYPES columnType) {
         String formattedField;
@@ -438,7 +436,7 @@ public class PostgreSQLBackend {
 
         fieldsForCreate += ";";
 
-        return "Alter table " + schemaName + "." + tableName + fieldsForCreate;
+        return "alter table " + schemaName + "." + tableName + fieldsForCreate;
     }
 
     private boolean isValidDate(String date) {

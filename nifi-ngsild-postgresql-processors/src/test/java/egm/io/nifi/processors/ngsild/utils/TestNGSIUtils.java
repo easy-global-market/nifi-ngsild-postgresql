@@ -40,10 +40,10 @@ public class TestNGSIUtils {
     @Test
     public void testTemporalEntities() throws IOException {
         String data = readFromInputStream(inputStream);
-        ArrayList<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
+        List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
         assertEquals(2, entities.size());
 
-        ArrayList<Attribute> attributes = entities.get(0).entityAttrs;
+        List<Attribute> attributes = entities.get(0).entityAttrs;
         Map<String, List<Attribute>> attributesByObservedAt = attributes.stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         assertEquals(3, attributesByObservedAt.size());
     }
@@ -51,7 +51,7 @@ public class TestNGSIUtils {
     @Test
     public void verifyIfAttributesAreCompliant() throws IOException {
         String data = readFromInputStream(inputStream);
-        ArrayList<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
+        List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data));
         assertTrue(
                 entities.stream().allMatch(
                         entity -> entity.entityAttrs.stream()

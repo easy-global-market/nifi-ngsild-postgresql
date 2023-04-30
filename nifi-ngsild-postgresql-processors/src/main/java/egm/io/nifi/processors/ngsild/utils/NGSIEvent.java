@@ -1,19 +1,19 @@
 package egm.io.nifi.processors.ngsild.utils;
 
-import java.util.ArrayList;
+import java.util.List;
 
 public class NGSIEvent {
     public long creationTime;
     public String ngsiLdTenant;
-    public ArrayList <Entity> entities;
+    public List<Entity> entities;
 
-    public NGSIEvent(long creationTime, String ngsiLdTenant, ArrayList<Entity> entities){
+    public NGSIEvent(long creationTime, String ngsiLdTenant, List<Entity> entities){
         this.creationTime = creationTime;
         this.ngsiLdTenant = ngsiLdTenant;
         this.entities = entities;
     }
 
-    public ArrayList<Entity> getEntities() {
+    public List<Entity> getEntities() {
         return entities;
     }
 

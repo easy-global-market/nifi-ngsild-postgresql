@@ -1,19 +1,19 @@
 package egm.io.nifi.processors.ngsild.utils;
 
-import java.util.ArrayList;
+import java.util.List;
 
 public class Entity {
     public String entityId;
     public String entityType;
-    public ArrayList<Attribute> entityAttrs;
+    public List<Attribute> entityAttrs;
 
-    public Entity(String entityId, String entityType, ArrayList<Attribute> entityAttrs) {
+    public Entity(String entityId, String entityType, List<Attribute> entityAttrs) {
         this.entityId = entityId;
         this.entityType = entityType;
         this.entityAttrs = entityAttrs;
     }
 
-    public ArrayList<Attribute> getEntityAttrs() {
+    public List<Attribute> getEntityAttrs() {
         return entityAttrs;
     }
 

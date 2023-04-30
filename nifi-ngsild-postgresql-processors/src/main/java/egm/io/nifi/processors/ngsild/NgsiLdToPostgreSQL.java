@@ -258,7 +258,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                                 context.getProperty(ENABLE_LOWERCASE).asBoolean()
                         );
 
-                ArrayList<Entity> entities = event.getEntities();
+                List<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
                     getLogger().info("Exporting entity " + entity.entityId);
 

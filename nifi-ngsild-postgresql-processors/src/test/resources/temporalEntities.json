@@ -1,72 +1,77 @@
 [
   {
-    "id" : "urn:ngsi-ld:NifiTest:Test01",
-    "type" : "NifiTest",
-    "hasRel" : {
-      "type" : "Relationship",
-      "object" : "urn:ngsi-ld:RelationTest:Test03",
-      "RelationshipDetails" : {
-        "id" : "urn:ngsi-ld:RelationTest:Test03",
-        "type" : "RelationTest",
-        "country" : [{
-          "type" : "Property",
-          "value" : "FR"
-        },
-        {
-                  "type" : "Property",
-                  "value" : "ES"
-                }]
+    "id": "urn:ngsi-ld:NifiTest:Test01",
+    "type": "NifiTest",
+    "hasRel": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:RelationTest:Test03",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:RelationTest:Test03",
+        "type": "RelationTest",
+        "country": [
+          {
+            "type": "Property",
+            "value": "FR"
+          },
+          {
+            "type": "Property",
+            "value": "ES"
+          }
+        ]
       }
     },
-    "hasRelation" : {
-      "type" : "Relationship",
-      "object" : "urn:ngsi-ld:RelationTest:Test02",
-      "RelationshipDetails" : {
-        "id" : "urn:ngsi-ld:RelationTest:Test02",
-        "type" : "RelationTest",
-        "country" : {
-          "type" : "Property",
-          "value" : "USA"
+    "hasRelation": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:RelationTest:Test02",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:RelationTest:Test02",
+        "type": "RelationTest",
+        "country": {
+          "type": "Property",
+          "value": "USA"
         }
       }
     },
-    "nullValue" : {
-      "type" : "Property",
-      "value" : null
+    "nullValue": {
+      "type": "Property",
+      "value": null
     },
-    "nullAttribute" : null,
-    "name" : {
-      "type" : "Property",
-      "value" : "test 01"
+    "nullAttribute": null,
+    "name": {
+      "type": "Property",
+      "value": "test 01"
     },
-    "date" : {
-      "type" : "Property",
-      "value" : "2020-10-29"
+    "date": {
+      "type": "Property",
+      "value": "2020-10-29"
     },
-    "time" : {
-      "type" : "Property",
-      "value" : "09:00:00Z"
+    "time": {
+      "type": "Property",
+      "value": "09:00:00Z"
     },
-    "dateTime" : {
-    "type" : "Property",
-    "value" : "2020-10-29T09:00:00Z"
-  },
-    "temperature" : [ {
-      "type" : "Property",
-      "value" : 16,
-      "unitCode" : "CEL",
-      "createdAt" : "2022-07-04T13:09:07.092021704Z",
-      "instanceId" : "urn:ngsi-ld:Instance:ecdaf9f1-adff-4c2f-9e54-bac898b479ad",
-      "modifiedAt" : "2022-07-04T13:09:32.358436714Z",
-      "observedAt" : "2020-10-29T09:00:00Z"
-    }, {
-      "type" : "Property",
-      "value" : "<14>",
-      "unitCode" : null,
-      "createdAt" : "2022-07-04T13:09:07.092021704Z",
-      "instanceId" : "urn:ngsi-ld:Instance:d5069c40-41e4-4640-939c-12df5336eeb4",
-      "observedAt" : "2020-09-29T09:00:00Z"
-    } ],
+    "dateTime": {
+      "type": "Property",
+      "value": "2020-10-29T09:00:00Z"
+    },
+    "temperature": [
+      {
+        "type": "Property",
+        "value": 16,
+        "unitCode": "CEL",
+        "createdAt": "2022-07-04T13:09:07.092021704Z",
+        "instanceId": "urn:ngsi-ld:Instance:ecdaf9f1-adff-4c2f-9e54-bac898b479ad",
+        "modifiedAt": "2022-07-04T13:09:32.358436714Z",
+        "observedAt": "2020-10-29T09:00:00Z"
+      },
+      {
+        "type": "Property",
+        "value": "<14>",
+        "unitCode": null,
+        "createdAt": "2022-07-04T13:09:07.092021704Z",
+        "instanceId": "urn:ngsi-ld:Instance:d5069c40-41e4-4640-939c-12df5336eeb4",
+        "observedAt": "2020-09-29T09:00:00Z"
+      }
+    ],
     "location": {
       "type": "GeoProperty",
       "value": {
@@ -79,57 +84,59 @@
     }
   },
   {
-    "id" : "urn:ngsi-ld:NifiTest:Test02",
-    "type" : "NifiTest",
-    "hasRel" : {
-      "type" : "Relationship",
-      "object" : "urn:ngsi-ld:RelationTest:Test04",
-      "RelationshipDetails" :
-      {
-        "id" : "urn:ngsi-ld:RelationTest:Test04",
-        "type" : "RelationTest",
-        "country" : [{
-          "type" : "Property",
-          "value" : "NZ"
-        },
-        {
-                  "type" : "Property",
-                  "value" : "ES"
-                }
-                ]
+    "id": "urn:ngsi-ld:NifiTest:Test02",
+    "type": "NifiTest",
+    "hasRel": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:RelationTest:Test04",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:RelationTest:Test04",
+        "type": "RelationTest",
+        "country": [
+          {
+            "type": "Property",
+            "value": "NZ"
+          },
+          {
+            "type": "Property",
+            "value": "ES"
+          }
+        ]
       }
     },
-    "hasRelation" : {
-      "type" : "Relationship",
-      "object" : "urn:ngsi-ld:RelationTest:Test01",
-      "RelationshipDetails" : {
-        "id" : "urn:ngsi-ld:RelationTest:Test01",
-        "type" : "RelationTest",
-        "country" : {
-          "type" : "Property",
-          "value" : "UK"
+    "hasRelation": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:RelationTest:Test01",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:RelationTest:Test01",
+        "type": "RelationTest",
+        "country": {
+          "type": "Property",
+          "value": "UK"
         }
       }
     },
-    "name" : {
-      "type" : "Property",
-      "value" : "test"
+    "name": {
+      "type": "Property",
+      "value": "test"
     },
-    "temperature" : [ {
-      "type" : "Property",
-      "value" : 14,
-      "createdAt" : "2022-07-05T11:57:38.941415997Z",
-      "instanceId" : "urn:ngsi-ld:Instance:3e934677-c427-40ac-b820-963200c1f08d",
-      "observedAt" : "2020-09-29T09:00:00Z"
-    },
+    "temperature": [
       {
-        "type" : "Property",
-        "value" : "<14>",
-        "unitCode" : null,
-        "createdAt" : "2022-07-04T13:09:07.092021704Z",
-        "instanceId" : "urn:ngsi-ld:Instance:d5069c40-41e4-4640-939c-12df5336eeb4",
-        "observedAt" : "2020-09-29T09:00:00Z"
-      }],
+        "type": "Property",
+        "value": 14,
+        "createdAt": "2022-07-05T11:57:38.941415997Z",
+        "instanceId": "urn:ngsi-ld:Instance:3e934677-c427-40ac-b820-963200c1f08d",
+        "observedAt": "2020-09-29T09:00:00Z"
+      },
+      {
+        "type": "Property",
+        "value": "<14>",
+        "unitCode": null,
+        "createdAt": "2022-07-04T13:09:07.092021704Z",
+        "instanceId": "urn:ngsi-ld:Instance:d5069c40-41e4-4640-939c-12df5336eeb4",
+        "observedAt": "2020-09-29T09:00:00Z"
+      }
+    ],
     "location": {
       "type": "GeoProperty",
       "value": {
