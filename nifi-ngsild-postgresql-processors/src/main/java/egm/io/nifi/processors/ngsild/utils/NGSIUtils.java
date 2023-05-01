@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
+
 public class NGSIUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(NGSIUtils.class);
@@ -19,7 +21,7 @@ public class NGSIUtils {
             List.of("type", "value", "object", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "@context", "createdAt", "modifiedAt");
 
-    public NGSIEvent getEventFromFlowFile(FlowFile flowFile, final ProcessSession session) {
+    public NGSIEvent getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
 
         final byte[] buffer = new byte[(int) flowFile.getSize()];
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
@@ -30,21 +32,19 @@ public class NGSIUtils {
         long creationTime = flowFile.getEntryDate();
 
         JSONArray content = new JSONArray(flowFileContent);
-        List<Entity> entities = parseNgsiLdEntities(content);
+        List<Entity> entities = parseNgsiLdEntities(content, flattenObservations);
 
         return new NGSIEvent(creationTime, ngsiLdTenant, entities);
     }
 
-    public List<Entity> parseNgsiLdEntities(JSONArray content) {
+    public List<Entity> parseNgsiLdEntities(JSONArray content, boolean flattenObservations) {
         List<Entity> entities = new ArrayList<>();
-        String entityType;
-        String entityId;
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
-            entityId = temporalEntity.getString("id");
-            entityType = temporalEntity.getString("type");
+            String entityId = temporalEntity.getString("id");
+            String entityType = temporalEntity.getString("type");
             logger.debug("Dealing with entity {} of type {}", entityId, entityType);
-            ArrayList<Attribute> attributes = new ArrayList<>();
+            List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
@@ -52,14 +52,15 @@ public class NGSIUtils {
                     Object object = temporalEntity.get(key);
                     if (object instanceof JSONArray) {
                         // it is a multi-attribute (see section 4.5.5 in NGSI-LD specification)
+                        // or an attribute with a temporal evolution
                         JSONArray values = temporalEntity.getJSONArray(key);
                         for (int j = 0; j < values.length(); j++) {
                             JSONObject value = values.getJSONObject(j);
-                            Attribute attribute = parseNgsiLdAttribute(key, value);
+                            Attribute attribute = parseNgsiLdAttribute(key, value, flattenObservations);
                             addAttributeIfValid(attributes, attribute);
                         }
                     } else if (object instanceof JSONObject) {
-                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object);
+                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object, flattenObservations);
                         addAttributeIfValid(attributes, attribute);
                     } else {
                         logger.warn("Attribute {} has unexpected value type: {}", key, object.getClass());
@@ -72,7 +73,7 @@ public class NGSIUtils {
         return entities;
     }
 
-    private Attribute parseNgsiLdAttribute(String key, JSONObject value) {
+    private Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
         // When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification -
         // if it has no history in the specified time range.
         // In this case, some flow file can give entity that contains attributes with only null values so attribute type can be set to null
@@ -144,7 +145,15 @@ public class NGSIUtils {
             }
         }
 
-        return new Attribute(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
+        if (flattenObservations && !Objects.equals(observedAt, "")) {
+            Attribute parameterName = new Attribute(
+                    "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
+            );
+            subAttributes.add(parameterName);
+            return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
+        } else {
+            return new Attribute(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
+        }
     }
 
     private Attribute parseNgsiLdSubAttribute(String key, JSONObject value) {

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "urn:ngsi-ld:ShellfishTable:0101010101",
+    "type": "ShellfishTable",
+    "addressLocality": {
+      "type": "Property",
+      "value": "LOUPIAN"
+    },
+    "concessionNumber": {
+      "type": "Property",
+      "value": "0101010101"
+    },
+    "expiryDate": {
+      "type": "Property",
+      "value": "26/12/2025"
+    },
+    "familyOfUse": {
+      "type": "Property",
+      "value": "Elevage"
+    },
+    "managementStructure": {
+      "type": "Property",
+      "value": "DML"
+    },
+    "natureOfUseLabel": {
+      "type": "Property",
+      "value": "Sur corde eau profonde"
+    },
+    "parcel": {
+      "type": "Property",
+      "value": "1111"
+    },
+    "rank": {
+      "type": "Property",
+      "value": "Z9"
+    },
+    "structure": {
+      "type": "Property",
+      "value": "table"
+    },
+    "surface": {
+      "type": "Property",
+      "value": "1309",
+      "unitCode": "MTK"
+    },
+    "containedIn": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:Place:TA"
+    },
+    "location": {
+      "type": "GeoProperty",
+      "value": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                1.12345678,
+                42.12345678
+              ],
+              [
+                1.12345679,
+                42.12345679
+              ],
+              [
+                1.12345680,
+                42.12345680
+              ],
+              [
+                1.12345679,
+                42.12345679
+              ],
+              [
+                1.12345678,
+                42.12345678
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  }
+]

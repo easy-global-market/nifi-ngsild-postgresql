@@ -25,6 +25,8 @@ public final class NGSIConstants {
     public static final String CREATED_AT = "createdAt";
     public static final String MODIFIED_AT = "modifiedAt";
 
+    public static final String GENERIC_MEASURE = "measure";
+
     /**
      * Constructor. It is private since utility classes should not have a public or default constructor.
      */

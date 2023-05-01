@@ -44,6 +44,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
     private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
+    private static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
             .name("JDBC Connection Pool")
@@ -245,7 +246,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
             NGSIUtils n = new NGSIUtils();
-            final NGSIEvent event = n.getEventFromFlowFile(flowFile, session);
+            final boolean flattenObservations = flowFile.getAttribute(FLATTEN_OBSERVATIONS) != null &&
+                    Objects.equals(flowFile.getAttribute(FLATTEN_OBSERVATIONS), "true");
+            final NGSIEvent event = n.getEventFromFlowFile(flowFile, flattenObservations, session);
             final long creationTime = event.getCreationTime();
             final String ngsiLdTenant =
                     (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
@@ -294,7 +297,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                                     updatedListOfTypedFields,
                                     context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
                                     context.getProperty(EXPORT_SYSATTRS).asBoolean(),
-                                    context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean()
+                                    context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean(),
+                                    flattenObservations
                             );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.

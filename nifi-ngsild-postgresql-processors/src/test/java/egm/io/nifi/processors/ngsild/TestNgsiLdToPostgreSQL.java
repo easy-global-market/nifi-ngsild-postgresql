@@ -195,7 +195,7 @@ public class TestNgsiLdToPostgreSQL {
 
         try {
             Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
-            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
+            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
             List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
            
             try {
@@ -228,7 +228,7 @@ public class TestNgsiLdToPostgreSQL {
             Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
                     backend.listOfFields(entity, "", false, ignoredAttributes);
             List<String> valuesForInsert =
-                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
+                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
 
             assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredattr")));
             // values for ignored attribute should not be in the values for insert
@@ -253,7 +253,7 @@ public class TestNgsiLdToPostgreSQL {
             Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
                     backend.listOfFields(entity, "", false, ignoredAttributes);
             List<String> valuesForInsert =
-                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true);
+                    backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
 
             assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredsubattr")));
             // values for ignored sub-attribute should not be in the values for insert

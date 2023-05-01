@@ -19,6 +19,8 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
+
 public class PostgreSQLBackend {
 
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLBackend.class);
@@ -124,7 +126,8 @@ public class PostgreSQLBackend {
             long creationTime,
             String datasetIdPrefixToTruncate,
             Boolean exportSysAttrs,
-            Boolean ignoreEmptyObservedAt
+            Boolean ignoreEmptyObservedAt,
+            Boolean flattenObservations
     ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
@@ -146,20 +149,53 @@ public class PostgreSQLBackend {
             oldestTimeStamp = observedTimestamps.get(0);
 
         for (String observedTimestamp : observedTimestamps) {
-            for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
-                Map<String, String> attributesValues =
-                        insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                                creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
-                valuesForColumns.putAll(attributesValues);
+            if (!flattenObservations) {
+                for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
+                    Map<String, String> attributesValues =
+                            insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                    valuesForColumns.putAll(attributesValues);
+                }
+                List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
+                for (String s : listofEncodedName) {
+                    valuesForColumns.putIfAbsent(s, null);
+                }
+                boolean hasObservations = valuesForColumns.entrySet().stream().anyMatch(entry ->
+                        entry.getKey().endsWith("observedat") && entry.getValue() != null);
+                if (hasObservations || !ignoreEmptyObservedAt)
+                    valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
+            } else {
+                // when flattening observations, there may have more than one row per observation date
+                List<Attribute> attributes = attributesByObservedAt.get(observedTimestamp);
+                List<Attribute> commonAttributes =
+                        attributes.stream()
+                                .filter(attribute -> !Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
+                                .collect(Collectors.toList());
+                // first fill with the common attributes (the non observed ones)
+                for (Attribute commonAttribute: commonAttributes) {
+                    Map<String, String> attributesValues =
+                            insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                    valuesForColumns.putAll(attributesValues);
+                }
+                List<Attribute> observedAttributes =
+                        attributes.stream()
+                                .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
+                                .collect(Collectors.toList());
+                // then for each observed attribute, add a new row
+                for (Attribute observedAttribute : observedAttributes) {
+                    Map<String, String> attributesValues =
+                            insertAttributesValues(observedAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                    valuesForColumns.putAll(attributesValues);
+
+                    List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
+                    for (String s : listofEncodedName) {
+                        valuesForColumns.putIfAbsent(s, null);
+                    }
+                    valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
+                }
             }
-            List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
-            for (String s : listofEncodedName) {
-                valuesForColumns.putIfAbsent(s, null);
-            }
-            boolean hasObservations = valuesForColumns.entrySet().stream().anyMatch(entry ->
-                    entry.getKey().endsWith("observedat") && entry.getValue() != null);
-            if (hasObservations || !ignoreEmptyObservedAt)
-                valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
         }
 
         return valuesForInsertList;
@@ -360,9 +396,11 @@ public class PostgreSQLBackend {
             Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
             String datasetIdPrefixToTruncate,
             Boolean exportSysAttrs,
-            Boolean ignoreEmptyObservedAt) {
+            Boolean ignoreEmptyObservedAt,
+            Boolean flattenObservations
+    ) {
         List<String> valuesForInsert =
-                this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt);
+                this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, flattenObservations);
 
         return "insert into " + schemaName + "." + tableName + " " + this.getFieldsForInsert(listOfFields.keySet()) + " values " + String.join(",", valuesForInsert) + ";";
     }

@@ -1,0 +1,208 @@
+[
+  {
+    "id": "urn:ngsi-ld:Distribution:MicrobiologieDREAL:P6",
+    "type": "Distribution",
+    "title": {
+      "type": "Property",
+      "value": "Débouché ruisseau Fontanilles"
+    },
+    "accessURL": {
+      "type": "Property",
+      "value": "https://smbt-rol-recette.stellio.io/ngsi-ld/v1/temporal/urn:ngsi-ld:Distribution:MicrobiologieDREAL:P6"
+    },
+    "servesDataset": {
+      "type": "Relationship",
+      "object": "urn:ngsi-ld:Dataset:MicrobiologieDREAL",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:Dataset:MicrobiologieDREAL",
+        "type": "Dataset",
+        "description": {
+          "type": "Property",
+          "value": "Données de suivi microbiologique aux exutoires de la lagune de Thau opéré par la DREAL et le SMBT depuis 2006."
+        },
+        "title": {
+          "type": "Property",
+          "value": "Microbiologie DREAL - SMBT"
+        },
+        "catalog": {
+          "type": "Relationship",
+          "object": "urn:ngsi-ld:Catalog:SMBT"
+        },
+        "landingPage": {
+          "type": "Property",
+          "value": "https://www.smbt.fr/"
+        },
+        "theme": [
+          {
+            "type": "Relationship",
+            "datasetId": "urn:ngsi-ld:Dataset:Theme:EauNutriments",
+            "object": "urn:ngsi-ld:Theme:EauNutriments"
+          },
+          {
+            "type": "Relationship",
+            "datasetId": "urn:ngsi-ld:Dataset:Theme:RisquesEnvironnement",
+            "object": "urn:ngsi-ld:Theme:RisquesEnvironnement"
+          }
+        ],
+        "includedParameters": [
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "oxygenSaturation"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:oxygenSaturation",
+            "value": "% de saturation en oxygène",
+            "unitCode": "H93"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "faecalEnterococcus"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:faecalEnterococcus",
+            "value": "Entérocoques fécaux",
+            "unitCode": "K63"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "conductivity"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:conductivity",
+            "value": "Conductivité",
+            "unitCode": "D10"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "pH"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:pH",
+            "value": "pH",
+            "unitCode": "Q30"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "dissolvedOxygen"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:dissolvedOxygen",
+            "value": "Oxygène dissous",
+            "unitCode": "M1"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "airTemperature"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:airTemperature",
+            "value": "Température de l'air",
+            "unitCode": "CEL"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "waterTemperature"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:waterTemperature",
+            "value": "Température de l'eau",
+            "unitCode": "CEL"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "salinity"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:salinity",
+            "value": "Salinité",
+            "unitCode": "NX"
+          },
+          {
+            "type": "Property",
+            "propertyName": {
+              "type": "Property",
+              "value": "faecalColiform"
+            },
+            "datasetId": "urn:ngsi-ld:Dataset:includedParameters:faecalColiform",
+            "value": "Coliformes fécaux",
+            "unitCode": "K63"
+          }
+        ]
+      }
+    },
+    "temporalResolution": {
+      "type": "Property",
+      "value": "N/A"
+    },
+    "specificAccessPolicy": {
+      "type": "Property",
+      "value": "AUTH_READ"
+    },
+    "lastModifiedAt": {
+      "type": "Property",
+      "value": "2023-04-11T22:00:00Z"
+    },
+    "stationCode": {
+      "type": "Property",
+      "value": "P6"
+    },
+    "faecalColiform": [
+      {
+        "type": "Property",
+        "value": 9800,
+        "unitCode": "K63",
+        "createdAt": "2023-04-27T13:41:03.879803952Z",
+        "instanceId": "urn:ngsi-ld:Instance:6bcb81a2-f753-4abf-9d3c-1db881ae6350",
+        "observedAt": "2022-11-07T00:00:00Z"
+      },
+      {
+        "type": "Property",
+        "value": 140,
+        "unitCode": "K63",
+        "createdAt": "2023-04-27T13:41:03.712973836Z",
+        "instanceId": "urn:ngsi-ld:Instance:45261706-aacd-417b-80b2-46cac06690fb",
+        "observedAt": "2022-10-03T00:00:00Z"
+      }
+    ],
+    "faecalEnterococcus": [
+      {
+        "type": "Property",
+        "value": 7500,
+        "unitCode": "K63",
+        "createdAt": "2023-04-27T13:41:03.879803952Z",
+        "instanceId": "urn:ngsi-ld:Instance:8A9DDB2A-0983-4E93-B75B-12DE32E0F862",
+        "observedAt": "2022-11-07T00:00:00Z"
+      },
+      {
+        "type": "Property",
+        "value": 210,
+        "unitCode": "K63",
+        "createdAt": "2023-04-27T13:41:03.712973836Z",
+        "instanceId": "urn:ngsi-ld:Instance:187EB8E1-4F50-4FC5-AC52-E8FC1A53D490",
+        "observedAt": "2022-10-03T00:00:00Z"
+      }
+    ],
+    "location": {
+      "type": "GeoProperty",
+      "value": {
+        "type": "Point",
+        "coordinates": [
+          3.536632,
+          43.363106
+        ]
+      }
+    },
+    "status": {
+      "type": "Property",
+      "value": "active"
+    }
+  }
+]

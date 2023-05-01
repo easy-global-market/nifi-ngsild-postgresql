@@ -1,0 +1,163 @@
+[
+  {
+    "id": "urn:ngsi-ld:Distribution:Zone:104-P-006:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
+    "type": "Distribution",
+    "title": {
+      "type": "Property",
+      "createdAt": "2023-04-19T17:59:50.471446581Z",
+      "value": "104-P-006 - Mourre-Blanc (a)"
+    },
+    "servesDataset": {
+      "type": "Relationship",
+      "createdAt": "2023-04-19T17:59:50.467619709Z",
+      "object": "urn:ngsi-ld:Dataset:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
+      "RelationshipDetails": {
+        "id": "urn:ngsi-ld:Dataset:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
+        "type": "Dataset",
+        "description": {
+          "type": "Property",
+          "value": "Données d'observation et de surveillance bancarisées dans Quadrige"
+        },
+        "isPublishedBy": {
+          "type": "Relationship",
+          "object": "urn:ngsi-ld:Agent:Ifremer"
+        },
+        "title": {
+          "type": "Property",
+          "value": "Surveillance littorale (Microbiologie - Microbiologie/Bactéries tests)"
+        },
+        "catalog": {
+          "type": "Relationship",
+          "object": "urn:ngsi-ld:Catalog:Sextant"
+        },
+        "landingPage": {
+          "type": "Property",
+          "value": "https://sextant.ifremer.fr/Services/Inspire/Services-WFS/Surveillance-littorale-reseaux-de-surveillance-littorale-actifs-historiques"
+        },
+        "specificAccessPolicy": {
+          "type": "Property",
+          "value": "AUTH_READ"
+        },
+        "group": {
+          "type": "Property",
+          "value": "Microbiologie/Bactéries tests"
+        },
+        "includedParameters": {
+          "type": "Property",
+          "propertyName": {
+            "type": "Property",
+            "value": "faecalColiform"
+          },
+          "datasetId": "urn:ngsi-ld:Dataset:faecalColiform:",
+          "parameterCode": {
+            "type": "Property",
+            "value": "ECOLI"
+          },
+          "value": "Escherichia coli"
+        },
+        "subTheme": {
+          "type": "Property",
+          "value": "Microbiologie"
+        }
+      }
+    },
+    "specificAccessPolicy": {
+      "type": "Property",
+      "createdAt": "2023-04-19T17:59:50.469999715Z",
+      "value": "AUTH_READ"
+    },
+    "sextantCode": {
+      "type": "Property",
+      "createdAt": "2023-04-19T17:59:50.469144890Z",
+      "value": 37087007
+    },
+    "stationCode": {
+      "type": "Property",
+      "createdAt": "2023-04-19T17:59:50.470740226Z",
+      "value": "104-P-006"
+    },
+    "createdAt": "2023-04-19T17:59:50.464421175Z",
+    "faecalColiform": [
+      {
+        "type": "Property",
+        "citation": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:28:59.135150489Z",
+          "value": "Source : Quadrige - Programme : REMI - Saisisseur : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Préleveur : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Analyste : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Mise à jour du 09/10/2003"
+        },
+        "depthSampling": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:28:59.135824771Z",
+          "value": "Support : Bivalve - Mytilus galloprovincialis (moule méditerranéenne) - Niveau : Mi-profondeur"
+        },
+        "qualityDescription": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:28:59.136424833Z",
+          "value": "Résultat validé mais non qualifié"
+        },
+        "qualityLevel": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:28:59.137110787Z",
+          "value": "Non qualifié"
+        },
+        "sampleDescription": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:28:59.137955996Z",
+          "value": "Support : Bivalve - Taxon support : Mytilus galloprovincialis"
+        },
+        "createdAt": "2023-04-29T12:28:59.134432516Z",
+        "datasetId": "urn:ngsi-ld:Dataset:K63:HalfBottom",
+        "isPartOfProgram": {
+          "type": "Relationship",
+          "createdAt": "2023-04-29T12:28:59.138514143Z",
+          "object": "urn:ngsi-ld:Program:REMI"
+        },
+        "value": 55.0,
+        "observedAt": "1990-12-03T09:50:00Z",
+        "unitCode": "K63"
+      },
+      {
+        "type": "Property",
+        "citation": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:44:25.655018615Z",
+          "value": "Source : Quadrige - Programme : REMI - Saisisseur : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Préleveur : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Analyste : Ifremer - LERLR - Laboratoire Environnement Ressources Languedoc Roussillon - Sète - Mise à jour du 07/10/2003"
+        },
+        "depthSampling": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:44:25.655644089Z",
+          "value": "Support : Bivalve - Mytilus galloprovincialis (moule méditerranéenne) - Niveau : Surface (0-1m)"
+        },
+        "qualityDescription": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:44:25.656414978Z",
+          "value": "Résultat validé mais non qualifié"
+        },
+        "qualityLevel": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:44:25.657351513Z",
+          "value": "Non qualifié"
+        },
+        "sampleDescription": {
+          "type": "Property",
+          "createdAt": "2023-04-29T12:44:25.657987086Z",
+          "value": "Support : Bivalve - Taxon support : Mytilus galloprovincialis"
+        },
+        "createdAt": "2023-04-29T12:44:25.654126181Z",
+        "datasetId": "urn:ngsi-ld:Dataset:K63:0To1Meter",
+        "isPartOfProgram": {
+          "type": "Relationship",
+          "createdAt": "2023-04-29T12:44:25.658454130Z",
+          "object": "urn:ngsi-ld:Program:REMI"
+        },
+        "value": 24.0,
+        "observedAt": "1989-04-10T07:45:00Z",
+        "unitCode": "K63"
+      }
+    ],
+    "modifiedAt": "2023-04-29T12:44:25.659355115Z",
+    "@context": [
+      "https://raw.githubusercontent.com/SMBT-ROL/smbt-data-models/master/jsonld-contexts/smbt-rol.jsonld"
+    ]
+  }
+]
