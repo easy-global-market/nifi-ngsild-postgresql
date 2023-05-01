@@ -15,6 +15,7 @@ public final class NGSICharsets {
 
     /**
      * Encodes a string for PostgreSQL. This includes CartoDB. Only lowercase alphanumerics and _ are allowed.
+     *
      * @param in
      * @return The encoded string
      */

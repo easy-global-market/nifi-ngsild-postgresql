@@ -7,7 +7,7 @@ public class NGSIEvent {
     public String ngsiLdTenant;
     public List<Entity> entities;
 
-    public NGSIEvent(long creationTime, String ngsiLdTenant, List<Entity> entities){
+    public NGSIEvent(long creationTime, String ngsiLdTenant, List<Entity> entities) {
         this.creationTime = creationTime;
         this.ngsiLdTenant = ngsiLdTenant;
         this.entities = entities;

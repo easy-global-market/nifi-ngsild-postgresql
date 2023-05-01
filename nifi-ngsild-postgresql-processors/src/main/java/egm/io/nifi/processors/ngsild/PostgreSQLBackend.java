@@ -26,14 +26,14 @@ public class PostgreSQLBackend {
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLBackend.class);
 
     public Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields(
-            Entity entity,
-            String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs,
-            Set<String> ignoredAttributes) {
+        Entity entity,
+        String datasetIdPrefixToTruncate,
+        Boolean exportSysAttrs,
+        Set<String> ignoredAttributes) {
         Map<String, POSTGRESQL_COLUMN_TYPES> aggregation = new TreeMap<>();
 
         Map<String, List<Attribute>> attributesByObservedAt =
-                entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+            entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
 
         aggregation.put(NGSIConstants.RECV_TIME, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
         aggregation.put(NGSIConstants.ENTITY_ID, POSTGRESQL_COLUMN_TYPES.TEXT);
@@ -90,7 +90,7 @@ public class PostgreSQLBackend {
                     if (!ignoredAttributes.contains(subAttribute.getAttrName())) {
                         String subAttrName = subAttribute.getAttrName();
                         String encodedSubAttrName =
-                                encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttrName, datasetIdPrefixToTruncate);
+                            encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttrName, datasetIdPrefixToTruncate);
                         if (subAttribute.getAttrValue() instanceof Number)
                             aggregation.put(encodedSubAttrName, POSTGRESQL_COLUMN_TYPES.NUMERIC);
                         else
@@ -121,23 +121,23 @@ public class PostgreSQLBackend {
     }
 
     public List<String> getValuesForInsert(
-            Entity entity,
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
-            long creationTime,
-            String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs,
-            Boolean ignoreEmptyObservedAt,
-            Boolean flattenObservations
+        Entity entity,
+        Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
+        long creationTime,
+        String datasetIdPrefixToTruncate,
+        Boolean exportSysAttrs,
+        Boolean ignoreEmptyObservedAt,
+        Boolean flattenObservations
     ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
         Map<String, String> valuesForColumns = new TreeMap<>();
         Map<String, List<Attribute>> attributesByObservedAt =
-                entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+            entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         List<String> observedTimestamps =
-                attributesByObservedAt.keySet().stream()
-                        .sorted()
-                        .collect(Collectors.toList());
+            attributesByObservedAt.keySet().stream()
+                .sorted()
+                .collect(Collectors.toList());
 
         String oldestTimeStamp;
         if (observedTimestamps.get(0).equals("")) {
@@ -152,8 +152,8 @@ public class PostgreSQLBackend {
             if (!flattenObservations) {
                 for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
                     Map<String, String> attributesValues =
-                            insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                        insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
                     valuesForColumns.putAll(attributesValues);
                 }
                 List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
@@ -161,32 +161,32 @@ public class PostgreSQLBackend {
                     valuesForColumns.putIfAbsent(s, null);
                 }
                 boolean hasObservations = valuesForColumns.entrySet().stream().anyMatch(entry ->
-                        entry.getKey().endsWith("observedat") && entry.getValue() != null);
+                    entry.getKey().endsWith("observedat") && entry.getValue() != null);
                 if (hasObservations || !ignoreEmptyObservedAt)
                     valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
             } else {
                 // when flattening observations, there may have more than one row per observation date
                 List<Attribute> attributes = attributesByObservedAt.get(observedTimestamp);
                 List<Attribute> commonAttributes =
-                        attributes.stream()
-                                .filter(attribute -> !Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                                .collect(Collectors.toList());
+                    attributes.stream()
+                        .filter(attribute -> !Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
+                        .collect(Collectors.toList());
                 // first fill with the common attributes (the non observed ones)
-                for (Attribute commonAttribute: commonAttributes) {
+                for (Attribute commonAttribute : commonAttributes) {
                     Map<String, String> attributesValues =
-                            insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                        insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
                     valuesForColumns.putAll(attributesValues);
                 }
                 List<Attribute> observedAttributes =
-                        attributes.stream()
-                                .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                                .collect(Collectors.toList());
+                    attributes.stream()
+                        .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
+                        .collect(Collectors.toList());
                 // then for each observed attribute, add a new row
                 for (Attribute observedAttribute : observedAttributes) {
                     Map<String, String> attributesValues =
-                            insertAttributesValues(observedAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                                    creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                        insertAttributesValues(observedAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
                     valuesForColumns.putAll(attributesValues);
 
                     List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
@@ -202,14 +202,14 @@ public class PostgreSQLBackend {
     }
 
     private Map<String, String> insertAttributesValues(
-            Attribute attribute,
-            Map<String, String> valuesForColumns,
-            Entity entity,
-            String oldestTimeStamp,
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
-            long creationTime,
-            String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs
+        Attribute attribute,
+        Map<String, String> valuesForColumns,
+        Entity entity,
+        String oldestTimeStamp,
+        Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
+        long creationTime,
+        String datasetIdPrefixToTruncate,
+        Boolean exportSysAttrs
     ) {
         String encodedAttributeName = encodeAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), datasetIdPrefixToTruncate);
         // some attributes may have been set to be ignored, don't add values for them
@@ -248,8 +248,7 @@ public class PostgreSQLBackend {
             valuesForColumns.put(encodedGeometry, formatFieldForValueInsert(geoJsonObject, listOfFields.get(encodedGeometry)));
             valuesForColumns.put(encodedGeoJson, formatFieldForValueInsert(geoJson, listOfFields.get(encodedGeoJson)));
             valuesForColumns.put(encodedAttributeName, formatFieldForValueInsert(location, listOfFields.get(encodedAttributeName)));
-        }
-        else {
+        } else {
             valuesForColumns.put(encodedAttributeName, formatFieldForValueInsert(attribute.getAttrValue(), listOfFields.get(encodedAttributeName)));
         }
 
@@ -259,8 +258,8 @@ public class PostgreSQLBackend {
         } else if (exportSysAttrs) {
             String encodedCreatedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.CREATED_AT);
             if (attribute.createdAt == null ||
-                    attribute.createdAt.equals("") ||
-                    ZonedDateTime.parse(attribute.createdAt).toEpochSecond() > ZonedDateTime.parse(oldestTimeStamp).toEpochSecond()
+                attribute.createdAt.equals("") ||
+                ZonedDateTime.parse(attribute.createdAt).toEpochSecond() > ZonedDateTime.parse(oldestTimeStamp).toEpochSecond()
             ) {
                 valuesForColumns.put(encodedCreatedAt, formatFieldForValueInsert(oldestTimeStamp, listOfFields.get(encodedCreatedAt)));
             } else
@@ -275,7 +274,7 @@ public class PostgreSQLBackend {
         if (attribute.isHasSubAttrs()) {
             for (Attribute subAttribute : attribute.getSubAttrs()) {
                 String encodedSubAttributeName =
-                        encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttribute.getAttrName(), datasetIdPrefixToTruncate);
+                    encodeSubAttributeToColumnName(attribute.getAttrName(), attribute.getDatasetId(), subAttribute.getAttrName(), datasetIdPrefixToTruncate);
                 if (listOfFields.containsKey(encodedSubAttributeName))
                     valuesForColumns.put(encodedSubAttributeName, formatFieldForValueInsert(subAttribute.getAttrValue(), listOfFields.get(encodedSubAttributeName)));
             }
@@ -389,18 +388,18 @@ public class PostgreSQLBackend {
     }
 
     public String insertQuery(
-            Entity entity,
-            long creationTime,
-            String schemaName,
-            String tableName,
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
-            String datasetIdPrefixToTruncate,
-            Boolean exportSysAttrs,
-            Boolean ignoreEmptyObservedAt,
-            Boolean flattenObservations
+        Entity entity,
+        long creationTime,
+        String schemaName,
+        String tableName,
+        Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields,
+        String datasetIdPrefixToTruncate,
+        Boolean exportSysAttrs,
+        Boolean ignoreEmptyObservedAt,
+        Boolean flattenObservations
     ) {
         List<String> valuesForInsert =
-                this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, flattenObservations);
+            this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, flattenObservations);
 
         return "insert into " + schemaName + "." + tableName + " " + this.getFieldsForInsert(listOfFields.keySet()) + " values " + String.join(",", valuesForInsert) + ";";
     }
@@ -419,13 +418,13 @@ public class PostgreSQLBackend {
             // Get the column names; column indices start from 1
             while (rs.next()) {
                 Pair<String, POSTGRESQL_COLUMN_TYPES> columnNameWithDataType =
-                        new ImmutablePair<>(rs.getString(1), POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase()));
+                    new ImmutablePair<>(rs.getString(1), POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase()));
                 if (listOfFields.containsKey(columnNameWithDataType.getKey()) &&
-                        listOfFields.get(columnNameWithDataType.getKey()) != columnNameWithDataType.getValue()) {
+                    listOfFields.get(columnNameWithDataType.getKey()) != columnNameWithDataType.getValue()) {
                     logger.info("Column {} with type {} already existed with a different type {}",
-                            columnNameWithDataType.getKey(),
-                            listOfFields.get(columnNameWithDataType.getKey()),
-                            columnNameWithDataType.getValue()
+                        columnNameWithDataType.getKey(),
+                        listOfFields.get(columnNameWithDataType.getKey()),
+                        columnNameWithDataType.getValue()
                     );
                     // update the column type to avoid type inconsistencies when inserting new values
                     // if a value in an entity does not match the current type in DB, a NULL value will be used

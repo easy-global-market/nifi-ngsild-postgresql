@@ -16,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class TestNGSIUtils {
 
+    private final NGSIUtils ngsiUtils = new NGSIUtils();
+
     private String loadTestFile(String filename) throws IOException {
         return Files.readString(Paths.get("src/test/resources/" + filename));
     }
-
-    private final NGSIUtils ngsiUtils = new NGSIUtils();
 
     @Test
     public void testTemporalEntities() throws IOException {
@@ -38,11 +38,11 @@ public class TestNGSIUtils {
         String data = loadTestFile("temporalEntities.json");
         List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), false);
         assertTrue(entities.stream().allMatch(
-                entity -> entity.entityAttrs.stream()
-                        .allMatch(attributes ->
-                                !Objects.equals(attributes.attrName, "nullValue") &&
-                                        !Objects.equals(attributes.attrName, "nullAttribute")
-                        )
+            entity -> entity.entityAttrs.stream()
+                .allMatch(attributes ->
+                    !Objects.equals(attributes.attrName, "nullValue") &&
+                        !Objects.equals(attributes.attrName, "nullAttribute")
+                )
         ));
     }
 
@@ -62,9 +62,9 @@ public class TestNGSIUtils {
         assertTrue(attributeNames.contains(GENERIC_MEASURE));
 
         List<Attribute> measureAttributes =
-                attributes.stream()
-                        .filter(attribute -> attribute.getAttrName().equals(GENERIC_MEASURE))
-                        .collect(Collectors.toList());
+            attributes.stream()
+                .filter(attribute -> attribute.getAttrName().equals(GENERIC_MEASURE))
+                .collect(Collectors.toList());
         // the entity under test has four observations
         assertEquals(4, measureAttributes.size());
         Attribute measureAttribute = measureAttributes.get(0);

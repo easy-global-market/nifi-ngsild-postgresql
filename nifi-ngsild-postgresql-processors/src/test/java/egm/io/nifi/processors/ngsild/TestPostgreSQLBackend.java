@@ -23,13 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestPostgreSQLBackend {
 
+    private final PostgreSQLBackend postgreSQLBackend = new PostgreSQLBackend();
+    private final NGSIUtils ngsiUtils = new NGSIUtils();
+
     private String loadTestFile(String filename) throws IOException {
         return Files.readString(Paths.get("src/test/resources/" + filename));
     }
-
-    private final PostgreSQLBackend postgreSQLBackend = new PostgreSQLBackend();
-
-    private final NGSIUtils ngsiUtils = new NGSIUtils();
 
     @Test
     public void testListOfFieldsWithFlattenedObservations() throws IOException {
@@ -37,7 +36,7 @@ public class TestPostgreSQLBackend {
         Entity entity = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), true).get(0);
 
         Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> typedFields =
-                postgreSQLBackend.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
+            postgreSQLBackend.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
         assertEquals(26, typedFields.size());
         Set<String> keys = typedFields.keySet();
         assertTrue(keys.contains(GENERIC_MEASURE));
@@ -53,15 +52,15 @@ public class TestPostgreSQLBackend {
         Entity entity = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), true).get(0);
 
         Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> typedFields =
-                postgreSQLBackend.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
+            postgreSQLBackend.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
         List<String> values = postgreSQLBackend.getValuesForInsert(
-                entity,
-                typedFields,
-                Instant.now().toEpochMilli(),
-                "urn:ngsi-ld:Dataset:",
-                false,
-                false,
-                true);
+            entity,
+            typedFields,
+            Instant.now().toEpochMilli(),
+            "urn:ngsi-ld:Dataset:",
+            false,
+            false,
+            true);
         assertEquals(expectedLines, values.size());
     }
 }

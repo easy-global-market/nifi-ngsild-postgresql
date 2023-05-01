@@ -18,7 +18,7 @@ public class NGSIUtils {
     private static final Logger logger = LoggerFactory.getLogger(NGSIUtils.class);
 
     public static List<String> IGNORED_KEYS_ON_ATTRIBUTES =
-            List.of("type", "value", "object", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
+        List.of("type", "value", "object", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "@context", "createdAt", "modifiedAt");
 
     public NGSIEvent getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
@@ -91,7 +91,7 @@ public class NGSIUtils {
             attrValue = value.opt("value");
         } else if ("GeoProperty".contentEquals(attrType)) {
             attrValue = value;
-        } else if ("".contentEquals(attrType)){
+        } else if ("".contentEquals(attrType)) {
             attrType = null;
             attrValue = null;
         } else {
@@ -147,7 +147,7 @@ public class NGSIUtils {
 
         if (flattenObservations && !Objects.equals(observedAt, "")) {
             Attribute parameterName = new Attribute(
-                    "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
+                "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
             );
             subAttributes.add(parameterName);
             return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
@@ -177,8 +177,8 @@ public class NGSIUtils {
     // So we filter out attributes that contain a null value or whose whole value is null
     private void addAttributeIfValid(List<Attribute> attributes, Attribute attribute) {
         if (attribute != null &&
-                attribute.getAttrValue() != null &&
-                !Objects.equals(attribute.getAttrValue().toString(), "null"))
+            attribute.getAttrValue() != null &&
+            !Objects.equals(attribute.getAttrValue().toString(), "null"))
             attributes.add(attribute);
     }
 }

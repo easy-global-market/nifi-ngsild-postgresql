@@ -33,185 +33,117 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 
 @SupportsBatching
 @InputRequirement(Requirement.INPUT_REQUIRED)
-@Tags({"Postgresql","sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI-LD", "FIWARE"})
+@Tags({"Postgresql", "sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI-LD", "FIWARE"})
 @CapabilityDescription("Create a database if not exists using the information coming from an NGSI-LD event converted to flow file." +
-        "After insert all of the vales of the flow file content extraction the entities and attributes")
+    "After insert all of the vales of the flow file content extraction the entities and attributes")
 @WritesAttributes({
-        @WritesAttribute(attribute = "sql.generated.key", description = "If the database generated a key for an INSERT statement and the Obtain Generated Keys property is set to true, "
-                + "this attribute will be added to indicate the generated key, if possible. This feature is not supported by all database vendors.")
+    @WritesAttribute(attribute = "sql.generated.key", description = "If the database generated a key for an INSERT statement and the Obtain Generated Keys property is set to true, "
+        + "this attribute will be added to indicate the generated key, if possible. This feature is not supported by all database vendors.")
 })
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
+    protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
+        .name("JDBC Connection Pool")
+        .description("Specifies the JDBC Connection Pool to use in order to convert the JSON message to a SQL statement. "
+            + "The Connection Pool is necessary in order to determine the appropriate database column types.")
+        .identifiesControllerService(DBCPService.class)
+        .required(true)
+        .build();
+    protected static final PropertyDescriptor DATA_MODEL = new PropertyDescriptor.Builder()
+        .name("data-model")
+        .displayName("Data Model")
+        .description("The Data model for creating the tables when an event have been received you can choose between" +
+            ": db-by-entity or db-by-entity-type, default value is db-by-entity")
+        .required(false)
+        .allowableValues("db-by-entity", "db-by-entity-type")
+        .defaultValue("db-by-entity-type")
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .build();
+    protected static final PropertyDescriptor DEFAULT_TENANT = new PropertyDescriptor.Builder()
+        .name("default-tenant")
+        .displayName("Default NGSI-LD Tenant")
+        .description("Default NGSI-LD Tenant for building the database name")
+        .required(false)
+        .defaultValue("")
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .build();
+    protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
+        .name("datasetid-prefix-truncate")
+        .displayName("Dataset id prefix to truncate")
+        .description("Prefix to truncate from dataset ids when generating column names for multi-attributes")
+        .required(false)
+        .defaultValue("urn:ngsi-ld:Dataset:")
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .build();
+    protected static final PropertyDescriptor ENABLE_ENCODING = new PropertyDescriptor.Builder()
+        .name("enable-encoding")
+        .displayName("Enable Encoding")
+        .description("true or false, true applies the new encoding, false applies the old encoding.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("true")
+        .build();
+    protected static final PropertyDescriptor ENABLE_LOWERCASE = new PropertyDescriptor.Builder()
+        .name("enable-lowercase")
+        .displayName("Enable Lowercase")
+        .description("true or false, true for creating the Schema and Tables name with lowercase.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("true")
+        .build();
+    protected static final PropertyDescriptor EXPORT_SYSATTRS = new PropertyDescriptor.Builder()
+        .name("export-sysattrs")
+        .displayName("Export Sysattrs")
+        .description("true or false, true for exporting the sys attributes of entities and attributes.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("false")
+        .build();
+    protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
+        .name("ignore-empty-observed-at")
+        .displayName("Ignore empty observed at lines")
+        .description("true or false, true for ignoring rows without any observation date.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("true")
+        .build();
+    protected static final PropertyDescriptor TRANSACTION_TIMEOUT = new PropertyDescriptor.Builder()
+        .name("Transaction Timeout")
+        .description("If the <Support Fragmented Transactions> property is set to true, specifies how long to wait for all FlowFiles for a particular fragment.identifier attribute "
+            + "to arrive before just transferring all of the FlowFiles with that identifier to the 'failure' relationship")
+        .required(false)
+        .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+        .build();
+    protected static final PropertyDescriptor BATCH_SIZE = new PropertyDescriptor.Builder()
+        .name("Batch Size")
+        .description("The preferred number of FlowFiles to put to the database in a single transaction")
+        .required(true)
+        .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
+        .defaultValue("10")
+        .build();
+    protected static final Relationship REL_SUCCESS = new Relationship.Builder()
+        .name("success")
+        .description("A FlowFile is routed to this relationship after the database is successfully updated")
+        .build();
+    protected static final Relationship REL_RETRY = new Relationship.Builder()
+        .name("retry")
+        .description("A FlowFile is routed to this relationship if the database cannot be updated but attempting the operation again may succeed")
+        .build();
+    protected static final Relationship REL_FAILURE = new Relationship.Builder()
+        .name("failure")
+        .description("A FlowFile is routed to this relationship if the database cannot be updated and retrying the operation will also fail, "
+            + "such as an invalid query or an integrity constraint violation")
+        .build();
     private static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
     private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
     private static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
-
-    protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
-            .name("JDBC Connection Pool")
-            .description("Specifies the JDBC Connection Pool to use in order to convert the JSON message to a SQL statement. "
-                    + "The Connection Pool is necessary in order to determine the appropriate database column types.")
-            .identifiesControllerService(DBCPService.class)
-            .required(true)
-            .build();
-
-    protected static final PropertyDescriptor DATA_MODEL = new PropertyDescriptor.Builder()
-            .name("data-model")
-            .displayName("Data Model")
-            .description("The Data model for creating the tables when an event have been received you can choose between" +
-                    ": db-by-entity or db-by-entity-type, default value is db-by-entity")
-            .required(false)
-            .allowableValues("db-by-entity","db-by-entity-type")
-            .defaultValue("db-by-entity-type")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .build();
-
-    protected static final PropertyDescriptor DEFAULT_TENANT = new PropertyDescriptor.Builder()
-            .name("default-tenant")
-            .displayName("Default NGSI-LD Tenant")
-            .description("Default NGSI-LD Tenant for building the database name")
-            .required(false)
-            .defaultValue("")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .build();
-
-    protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
-            .name("datasetid-prefix-truncate")
-            .displayName("Dataset id prefix to truncate")
-            .description("Prefix to truncate from dataset ids when generating column names for multi-attributes")
-            .required(false)
-            .defaultValue("urn:ngsi-ld:Dataset:")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .build();
-
-    protected static final PropertyDescriptor ENABLE_ENCODING = new PropertyDescriptor.Builder()
-            .name("enable-encoding")
-            .displayName("Enable Encoding")
-            .description("true or false, true applies the new encoding, false applies the old encoding.")
-            .required(false)
-            .allowableValues("true", "false")
-            .defaultValue("true")
-            .build();
-
-    protected static final PropertyDescriptor ENABLE_LOWERCASE = new PropertyDescriptor.Builder()
-            .name("enable-lowercase")
-            .displayName("Enable Lowercase")
-            .description("true or false, true for creating the Schema and Tables name with lowercase.")
-            .required(false)
-            .allowableValues("true", "false")
-            .defaultValue("true")
-            .build();
-
-    protected static final PropertyDescriptor EXPORT_SYSATTRS = new PropertyDescriptor.Builder()
-            .name("export-sysattrs")
-            .displayName("Export Sysattrs")
-            .description("true or false, true for exporting the sys attributes of entities and attributes.")
-            .required(false)
-            .allowableValues("true", "false")
-            .defaultValue("false")
-            .build();
-
-    protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
-            .name("ignore-empty-observed-at")
-            .displayName("Ignore empty observed at lines")
-            .description("true or false, true for ignoring rows without any observation date.")
-            .required(false)
-            .allowableValues("true", "false")
-            .defaultValue("true")
-            .build();
-
-    protected static final PropertyDescriptor TRANSACTION_TIMEOUT = new PropertyDescriptor.Builder()
-            .name("Transaction Timeout")
-            .description("If the <Support Fragmented Transactions> property is set to true, specifies how long to wait for all FlowFiles for a particular fragment.identifier attribute "
-                    + "to arrive before just transferring all of the FlowFiles with that identifier to the 'failure' relationship")
-            .required(false)
-            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
-            .build();
-
-    protected static final PropertyDescriptor BATCH_SIZE = new PropertyDescriptor.Builder()
-            .name("Batch Size")
-            .description("The preferred number of FlowFiles to put to the database in a single transaction")
-            .required(true)
-            .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
-            .defaultValue("10")
-            .build();
-
-    protected static final Relationship REL_SUCCESS = new Relationship.Builder()
-            .name("success")
-            .description("A FlowFile is routed to this relationship after the database is successfully updated")
-            .build();
-    protected static final Relationship REL_RETRY = new Relationship.Builder()
-            .name("retry")
-            .description("A FlowFile is routed to this relationship if the database cannot be updated but attempting the operation again may succeed")
-            .build();
-    protected static final Relationship REL_FAILURE = new Relationship.Builder()
-            .name("failure")
-            .description("A FlowFile is routed to this relationship if the database cannot be updated and retrying the operation will also fail, "
-                    + "such as an invalid query or an integrity constraint violation")
-            .build();
-
     private static final String FRAGMENT_ID_ATTR = FragmentAttributes.FRAGMENT_ID.key();
     private static final String FRAGMENT_INDEX_ATTR = FragmentAttributes.FRAGMENT_INDEX.key();
     private static final String FRAGMENT_COUNT_ATTR = FragmentAttributes.FRAGMENT_COUNT.key();
     private static final PostgreSQLBackend postgres = new PostgreSQLBackend();
-
-    @Override
-    protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        final List<PropertyDescriptor> properties = new ArrayList<>();
-        properties.add(CONNECTION_POOL);
-        properties.add(DATA_MODEL);
-        properties.add(DEFAULT_TENANT);
-        properties.add(DATASETID_PREFIX_TRUNCATE);
-        properties.add(ENABLE_ENCODING);
-        properties.add(ENABLE_LOWERCASE);
-        properties.add(EXPORT_SYSATTRS);
-        properties.add(IGNORE_EMPTY_OBSERVED_AT);
-        properties.add(BATCH_SIZE);
-        properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
-        return properties;
-    }
-
-    @Override
-    public Set<Relationship> getRelationships() {
-        final Set<Relationship> rels = new HashSet<>();
-        rels.add(REL_SUCCESS);
-        rels.add(REL_RETRY);
-        rels.add(REL_FAILURE);
-        return rels;
-    }
-
-    private static class FunctionContext extends RollbackOnFailure {
-        private boolean obtainKeys = false;
-        private boolean fragmentedTransaction = false;
-        private boolean originalAutoCommit = false;
-        private final long startNanos = System.nanoTime();
-
-        private FunctionContext(boolean rollbackOnFailure) {
-            super(rollbackOnFailure, true);
-        }
-
-        private boolean isSupportBatching() {
-            return !obtainKeys && !fragmentedTransaction;
-        }
-    }
-
-    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
-    private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
-    private ExceptionHandler<FunctionContext> exceptionHandler;
-
-
-    private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> {
-        final FlowFilePoll poll = pollFlowFiles(c, s, fc, r);
-        if (poll == null) {
-            return null;
-        }
-        fc.fragmentedTransaction = poll.isFragmentedTransaction();
-        return poll.getFlowFiles();
-    };
-
-
     private final PartialFunctions.InitConnection<FunctionContext, Connection> initConnection = (c, s, fc, ff) -> {
         final Connection connection = c.getProperty(CONNECTION_POOL).asControllerService(DBCPService.class)
-                .getConnection(ff == null ? Collections.emptyMap() : ff.get(0).getAttributes());
+            .getConnection(ff == null ? Collections.emptyMap() : ff.get(0).getAttributes());
         try {
             fc.originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -220,67 +152,57 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
         return connection;
     };
-
-
-    @FunctionalInterface
-    private interface GroupingFunction {
-        void apply(final ProcessContext context, final ProcessSession session, final FunctionContext fc,
-                   final Connection conn, final List<FlowFile> flowFiles,
-                   final List<StatementFlowFileEnclosure> groups,
-                   final Map<String, StatementFlowFileEnclosure> sqlToEnclosure,
-                   final RoutingResult result);
-    }
-
-    /**
-     * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
-     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
-     */
-    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
-        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
-        if (ignoredAttributesAttribute == null)
-            return Collections.emptySet();
-        else
-            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
-    }
-
+    private final GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
+    };
+    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
+    private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
+    private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> {
+        final FlowFilePoll poll = pollFlowFiles(c, s, fc, r);
+        if (poll == null) {
+            return null;
+        }
+        fc.fragmentedTransaction = poll.isFragmentedTransaction();
+        return poll.getFlowFiles();
+    };
+    private ExceptionHandler<FunctionContext> exceptionHandler;
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
             NGSIUtils n = new NGSIUtils();
             final boolean flattenObservations = flowFile.getAttribute(FLATTEN_OBSERVATIONS) != null &&
-                    Objects.equals(flowFile.getAttribute(FLATTEN_OBSERVATIONS), "true");
+                Objects.equals(flowFile.getAttribute(FLATTEN_OBSERVATIONS), "true");
             final NGSIEvent event = n.getEventFromFlowFile(flowFile, flattenObservations, session);
             final long creationTime = event.getCreationTime();
             final String ngsiLdTenant =
-                    (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
-                            context.getProperty(DEFAULT_TENANT).getValue() : event.getNgsiLdTenant();
+                (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
+                    context.getProperty(DEFAULT_TENANT).getValue() : event.getNgsiLdTenant();
             try {
                 final String schemaName =
-                        postgres.buildSchemaName(
-                                ngsiLdTenant,
-                                context.getProperty(ENABLE_ENCODING).asBoolean(),
-                                context.getProperty(ENABLE_LOWERCASE).asBoolean()
-                        );
+                    postgres.buildSchemaName(
+                        ngsiLdTenant,
+                        context.getProperty(ENABLE_ENCODING).asBoolean(),
+                        context.getProperty(ENABLE_LOWERCASE).asBoolean()
+                    );
 
                 List<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
                     getLogger().info("Exporting entity " + entity.entityId);
 
                     String tableName =
-                            postgres.buildTableName(
-                                    entity,
-                                    context.getProperty(DATA_MODEL).getValue(),
-                                    context.getProperty(ENABLE_ENCODING).asBoolean(),
-                                    context.getProperty(ENABLE_LOWERCASE).asBoolean(),
-                                    flowFile.getAttribute(TABLE_NAME_SUFFIX)
-                            );
+                        postgres.buildTableName(
+                            entity,
+                            context.getProperty(DATA_MODEL).getValue(),
+                            context.getProperty(ENABLE_ENCODING).asBoolean(),
+                            context.getProperty(ENABLE_LOWERCASE).asBoolean(),
+                            flowFile.getAttribute(TABLE_NAME_SUFFIX)
+                        );
 
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
-                            postgres.listOfFields(
-                                    entity,
-                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                                    context.getProperty(EXPORT_SYSATTRS).asBoolean(),
-                                    getIgnoredAttributes(flowFile)
-                            );
+                        postgres.listOfFields(
+                            entity,
+                            context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
+                            context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                            getIgnoredAttributes(flowFile)
+                        );
 
                     ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypes(tableName));
                     Map<String, POSTGRESQL_COLUMN_TYPES> updatedListOfTypedFields;
@@ -289,25 +211,25 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     else updatedListOfTypedFields = listOfFields;
 
                     final String sql =
-                            postgres.insertQuery(
-                                    entity,
-                                    creationTime,
-                                    schemaName,
-                                    tableName,
-                                    updatedListOfTypedFields,
-                                    context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                                    context.getProperty(EXPORT_SYSATTRS).asBoolean(),
-                                    context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean(),
-                                    flattenObservations
-                            );
+                        postgres.insertQuery(
+                            entity,
+                            creationTime,
+                            schemaName,
+                            tableName,
+                            updatedListOfTypedFields,
+                            context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
+                            context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                            context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean(),
+                            flattenObservations
+                        );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.
                     final StatementFlowFileEnclosure enclosure = sqlToEnclosure
-                            .computeIfAbsent(sql, k -> {
-                                final StatementFlowFileEnclosure newEnclosure = new StatementFlowFileEnclosure(sql);
-                                groups.add(newEnclosure);
-                                return newEnclosure;
-                            });
+                        .computeIfAbsent(sql, k -> {
+                            final StatementFlowFileEnclosure newEnclosure = new StatementFlowFileEnclosure(sql);
+                            groups.add(newEnclosure);
+                            return newEnclosure;
+                        });
 
                     if (!exceptionHandler.execute(fc, flowFile, input -> {
                         final PreparedStatement stmt = enclosure.getCachedStatement(conn);
@@ -332,14 +254,11 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     }
                     enclosure.addFlowFile(flowFile);
                 }
-            }catch (Exception e){
+            } catch (Exception e) {
                 getLogger().error(e.toString(), e);
             }
         }
     };
-
-    private final GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {};
-
     private final PutGroup.GroupFlowFiles<FunctionContext, Connection, StatementFlowFileEnclosure> groupFlowFiles = (context, session, fc, conn, flowFiles, result) -> {
         final Map<String, StatementFlowFileEnclosure> sqlToEnclosure = new HashMap<>();
         final List<StatementFlowFileEnclosure> groups = new ArrayList<>();
@@ -350,15 +269,12 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         // 3. Fragmented transaction: One FlowFile per Enclosure?
         if (fc.obtainKeys) {
             groupFlowFilesBySQL.apply(context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result);
-        }
-
-        else {
+        } else {
             groupFlowFilesBySQLBatch.apply(context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result);
         }
 
         return groups;
     };
-
     private final PutGroup.PutFlowFiles<FunctionContext, Connection, StatementFlowFileEnclosure> putFlowFiles = (context, session, fc, conn, enclosure, result) -> {
 
         if (fc.isSupportBatching()) {
@@ -376,9 +292,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             for (final FlowFile flowFile : enclosure.getFlowFiles()) {
 
                 final StatementFlowFileEnclosure targetEnclosure
-                        = enclosure instanceof FragmentedEnclosure
-                        ? ((FragmentedEnclosure) enclosure).getTargetEnclosure(flowFile)
-                        : enclosure;
+                    = enclosure instanceof FragmentedEnclosure
+                    ? ((FragmentedEnclosure) enclosure).getTargetEnclosure(flowFile)
+                    : enclosure;
 
                 // Execute update one by one.
                 exceptionHandler.execute(fc, flowFile, input -> {
@@ -421,6 +337,42 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
     };
 
+    @Override
+    protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
+        final List<PropertyDescriptor> properties = new ArrayList<>();
+        properties.add(CONNECTION_POOL);
+        properties.add(DATA_MODEL);
+        properties.add(DEFAULT_TENANT);
+        properties.add(DATASETID_PREFIX_TRUNCATE);
+        properties.add(ENABLE_ENCODING);
+        properties.add(ENABLE_LOWERCASE);
+        properties.add(EXPORT_SYSATTRS);
+        properties.add(IGNORE_EMPTY_OBSERVED_AT);
+        properties.add(BATCH_SIZE);
+        properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
+        return properties;
+    }
+
+    @Override
+    public Set<Relationship> getRelationships() {
+        final Set<Relationship> rels = new HashSet<>();
+        rels.add(REL_SUCCESS);
+        rels.add(REL_RETRY);
+        rels.add(REL_FAILURE);
+        return rels;
+    }
+
+    /**
+     * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
+     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
+     */
+    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
+        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
+        if (ignoredAttributesAttribute == null)
+            return Collections.emptySet();
+        else
+            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
+    }
 
     private ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError(final ProcessContext context, final ProcessSession session, final RoutingResult result) {
         ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError = createOnError(context, session, result, REL_FAILURE, REL_RETRY);
@@ -431,7 +383,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     break;
                 case Retry:
                     getLogger().error("Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
-                            new Object[]{i, e}, e);
+                        new Object[]{i, e}, e);
                     break;
             }
         });
@@ -439,7 +391,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     }
 
     private ExceptionHandler.OnError<FunctionContext, StatementFlowFileEnclosure> onBatchUpdateError(
-            final ProcessContext context, final ProcessSession session, final RoutingResult result) {
+        final ProcessContext context, final ProcessSession session, final RoutingResult result) {
         return RollbackOnFailure.createOnError((c, enclosure, r, e) -> {
 
             // If rollbackOnFailure is enabled, the error will be thrown as ProcessException instead.
@@ -490,7 +442,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 }
 
                 getLogger().error("Failed to update database due to a failed batch update, {}. There were a total of {} FlowFiles that failed, {} that succeeded, "
-                        + "and {} that were not execute and will be routed to retry; ", new Object[]{e, failureCount, successCount, retryCount}, e);
+                    + "and {} that were not execute and will be routed to retry; ", new Object[]{e, failureCount, successCount, retryCount}, e);
 
                 return;
 
@@ -498,7 +450,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
             // Apply default error handling and logging for other Exceptions.
             ExceptionHandler.OnError<RollbackOnFailure, FlowFileGroup> onGroupError
-                    = ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY);
+                = ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY);
             onGroupError = onGroupError.andThen((cl, il, rl, el) -> {
                 switch (r.destination()) {
                     case Failure:
@@ -506,7 +458,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                         break;
                     case Retry:
                         getLogger().error("Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
-                                new Object[]{il.getFlowFiles(), e}, e);
+                            new Object[]{il.getFlowFiles(), e}, e);
                         break;
                     default:
                         break;
@@ -571,9 +523,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         exceptionHandler.adjustError(adjustError);
     }
 
-
-
-
     @Override
     public void onTrigger(ProcessContext context, ProcessSessionFactory sessionFactory) throws ProcessException {
         final Boolean rollbackOnFailure = context.getProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE).asBoolean();
@@ -591,15 +540,16 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
      * <p>
      * Otherwise, if the Support Fragmented Transactions property is true, all FlowFiles that belong to the same
      * transaction will be sorted in the order that they should be evaluated.
-     *
+     * <p>
      * //@param context the process context for determining properties
      * //@param session the process session for pulling flowfiles
+     *
      * @return a FlowFilePoll containing a List of FlowFiles to process, or <code>null</code> if there are no FlowFiles to process
      */
 
 
     private FlowFilePoll pollFlowFiles(final ProcessContext context, final ProcessSession session,
-                                       final FunctionContext functionContext, final RoutingResult result) {
+        final FunctionContext functionContext, final RoutingResult result) {
         // Determine which FlowFile Filter to use in order to obtain FlowFiles.
         final boolean useTransactions = false;
         boolean fragmentedTransaction = false;
@@ -631,7 +581,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 // Map relationship based on context, and then let default handler to handle.
                 final ErrorTypes.Result adjustedRoute = adjustError.apply(functionContext, ErrorTypes.InvalidInput);
                 ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY)
-                        .apply(functionContext, () -> flowFiles, adjustedRoute, e);
+                    .apply(functionContext, () -> flowFiles, adjustedRoute, e);
                 return null;
             }
 
@@ -641,7 +591,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         return new FlowFilePoll(flowFiles, fragmentedTransaction);
     }
-
 
     /**
      * Returns the key that was generated from the given statement, or <code>null</code> if no key
@@ -670,11 +619,11 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
      * transaction information not being present. If the FlowFiles should be processed and not transferred
      * to any particular relationship yet, will return <code>null</code>
      *
-     * @param flowFiles the FlowFiles whose relationship is to be determined
+     * @param flowFiles                the FlowFiles whose relationship is to be determined
      * @param transactionTimeoutMillis the maximum amount of time (in milliseconds) that we should wait
-     *            for all FlowFiles in a transaction to be present before routing to failure
+     *                                 for all FlowFiles in a transaction to be present before routing to failure
      * @return the appropriate relationship to route the FlowFiles to, or <code>null</code> if the FlowFiles
-     *         should instead be processed
+     * should instead be processed
      */
 
     boolean isFragmentedTransactionReady(final List<FlowFile> flowFiles, final Long transactionTimeoutMillis) throws IllegalArgumentException {
@@ -689,7 +638,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 return true;
             } else if (fragmentCount == null) {
                 throw illegal.apply("Cannot process %s because there are %d FlowFiles with the same fragment.identifier "
-                        + "attribute but not all FlowFiles have a fragment.count attribute", new Object[] {flowFile, flowFiles.size()});
+                    + "attribute but not all FlowFiles have a fragment.count attribute", new Object[]{flowFile, flowFiles.size()});
             }
 
             final int numFragments;
@@ -697,24 +646,24 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 numFragments = Integer.parseInt(fragmentCount);
             } catch (final NumberFormatException nfe) {
                 throw illegal.apply("Cannot process %s because the fragment.count attribute has a value of '%s', which is not an integer",
-                        new Object[] {flowFile, fragmentCount});
+                    new Object[]{flowFile, fragmentCount});
             }
 
             if (numFragments < 1) {
                 throw illegal.apply("Cannot process %s because the fragment.count attribute has a value of '%s', which is not a positive integer",
-                        new Object[] {flowFile, fragmentCount});
+                    new Object[]{flowFile, fragmentCount});
             }
 
             if (selectedNumFragments == 0) {
                 selectedNumFragments = numFragments;
             } else if (numFragments != selectedNumFragments) {
                 throw illegal.apply("Cannot process %s because the fragment.count attribute has different values for different FlowFiles with the same fragment.identifier",
-                        new Object[] {flowFile});
+                    new Object[]{flowFile});
             }
 
             final String fragmentIndex = flowFile.getAttribute(FRAGMENT_INDEX_ATTR);
             if (fragmentIndex == null) {
-                throw illegal.apply("Cannot process %s because the fragment.index attribute is missing", new Object[] {flowFile});
+                throw illegal.apply("Cannot process %s because the fragment.index attribute is missing", new Object[]{flowFile});
             }
 
             final int idx;
@@ -722,17 +671,17 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 idx = Integer.parseInt(fragmentIndex);
             } catch (final NumberFormatException nfe) {
                 throw illegal.apply("Cannot process %s because the fragment.index attribute has a value of '%s', which is not an integer",
-                        new Object[] {flowFile, fragmentIndex});
+                    new Object[]{flowFile, fragmentIndex});
             }
 
             if (idx < 0) {
                 throw illegal.apply("Cannot process %s because the fragment.index attribute has a value of '%s', which is not a positive integer",
-                        new Object[] {flowFile, fragmentIndex});
+                    new Object[]{flowFile, fragmentIndex});
             }
 
             if (bitSet.get(idx)) {
                 throw illegal.apply("Cannot process %s because it has the same value for the fragment.index attribute as another FlowFile with the same fragment.identifier",
-                        new Object[] {flowFile});
+                    new Object[]{flowFile});
             }
 
             bitSet.set(idx);
@@ -751,7 +700,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         if (transactionTimeoutMillis != null) {
             if (latestQueueTime > 0L && System.currentTimeMillis() - latestQueueTime > transactionTimeoutMillis) {
-                throw illegal.apply("The transaction timeout has expired for the following FlowFiles; they will be routed to failure: %s", new Object[] {flowFiles});
+                throw illegal.apply("The transaction timeout has expired for the following FlowFiles; they will be routed to failure: %s", new Object[]{flowFiles});
             }
         }
 
@@ -760,6 +709,29 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     }
 
 
+    @FunctionalInterface
+    private interface GroupingFunction {
+        void apply(final ProcessContext context, final ProcessSession session, final FunctionContext fc,
+            final Connection conn, final List<FlowFile> flowFiles,
+            final List<StatementFlowFileEnclosure> groups,
+            final Map<String, StatementFlowFileEnclosure> sqlToEnclosure,
+            final RoutingResult result);
+    }
+
+    private static class FunctionContext extends RollbackOnFailure {
+        private final long startNanos = System.nanoTime();
+        private boolean obtainKeys = false;
+        private boolean fragmentedTransaction = false;
+        private boolean originalAutoCommit = false;
+
+        private FunctionContext(boolean rollbackOnFailure) {
+            super(rollbackOnFailure, true);
+        }
+
+        private boolean isSupportBatching() {
+            return !obtainKeys && !fragmentedTransaction;
+        }
+    }
 
     /**
      * A FlowFileFilter that is responsible for ensuring that the FlowFiles returned either belong
@@ -885,8 +857,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private static class StatementFlowFileEnclosure implements FlowFileGroup {
         private final String sql;
-        private PreparedStatement statement;
         private final List<FlowFile> flowFiles = new ArrayList<>();
+        private PreparedStatement statement;
 
         public StatementFlowFileEnclosure(String sql) {
             this.sql = sql;

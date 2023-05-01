@@ -10,13 +10,33 @@ public class Attribute {
     public String observedAt;
     public String createdAt;
     public String modifiedAt;
+    public boolean hasSubAttrs;
+    public List<Attribute> subAttrs;
+    public Attribute(
+        String attrName,
+        String attrType,
+        String datasetId,
+        String observedAt,
+        String createdAt,
+        String modifiedAt,
+        Object attrValue,
+        boolean hasSubAttrs,
+        List<Attribute> subAttrs
+    ) {
+        this.attrName = attrName;
+        this.attrType = attrType;
+        this.datasetId = datasetId;
+        this.observedAt = observedAt;
+        this.createdAt = createdAt;
+        this.modifiedAt = modifiedAt;
+        this.attrValue = attrValue;
+        this.hasSubAttrs = hasSubAttrs;
+        this.subAttrs = subAttrs;
+    }
 
     public String getObservedAt() {
         return observedAt;
     }
-
-    public boolean hasSubAttrs;
-    public List<Attribute> subAttrs;
 
     public boolean isHasSubAttrs() {
         return hasSubAttrs;
@@ -40,27 +60,5 @@ public class Attribute {
 
     public String getDatasetId() {
         return datasetId;
-    }
-
-    public Attribute(
-            String attrName,
-            String attrType,
-            String datasetId,
-            String observedAt,
-            String createdAt,
-            String modifiedAt,
-            Object attrValue,
-            boolean hasSubAttrs,
-            List<Attribute> subAttrs
-    ) {
-        this.attrName = attrName;
-        this.attrType = attrType;
-        this.datasetId = datasetId;
-        this.observedAt = observedAt;
-        this.createdAt = createdAt;
-        this.modifiedAt = modifiedAt;
-        this.attrValue = attrValue;
-        this.hasSubAttrs = hasSubAttrs;
-        this.subAttrs= subAttrs;
     }
 }
