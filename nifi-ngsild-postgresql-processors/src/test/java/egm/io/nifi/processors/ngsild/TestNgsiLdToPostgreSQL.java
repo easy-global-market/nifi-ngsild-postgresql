@@ -7,24 +7,21 @@ import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES
 import org.apache.nifi.processor.util.pattern.RollbackOnFailure;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.sql.ResultSet;
 import java.util.*;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-@RunWith(JUnit4.class)
 public class TestNgsiLdToPostgreSQL {
     private TestRunner runner;
     private PostgreSQLBackend backend;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         //Mock the DBCP Controller Service, so we can control the Results
         runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
