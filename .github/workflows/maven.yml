@@ -3,6 +3,8 @@ name: Java CI with Maven
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - "*.*.*"
   pull_request:
     branches: [ "main" ]
 
@@ -21,3 +23,8 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B package --file pom.xml
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: nifi-concession-transform-nar/target/nifi-concession-transform-nar-*.*.*.nar

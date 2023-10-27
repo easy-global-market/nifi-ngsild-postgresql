@@ -27,8 +27,6 @@
     <packaging>jar</packaging>
     <properties>
         <nifi.version>1.23.2</nifi.version>
-        <mockito.version>4.11.0</mockito.version>
-        <junit.version>5.10.0</junit.version>
     </properties>
 
     <dependencies>
@@ -36,6 +34,7 @@
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-api</artifactId>
             <version>${nifi.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.nifi</groupId>
@@ -78,31 +77,26 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>2.0.9</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>${mockito.version}</version>
         </dependency>
     </dependencies>
 </project>
