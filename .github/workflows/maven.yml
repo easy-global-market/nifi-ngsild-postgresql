@@ -27,4 +27,4 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: nifi-concession-transform-nar/target/nifi-concession-transform-nar-*.*.*.nar
+        files: nifi-ngsild-postgresql-nar/target/nifi-ngsild-postgresql-nar-*.*.*.nar
