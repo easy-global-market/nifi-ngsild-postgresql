@@ -31,6 +31,13 @@
     </properties>
 
     <dependencies>
+        <!-- it has to be declared in order to use the DBCP service from NiFi -->
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-standard-services-api-nar</artifactId>
+            <version>1.23.2</version>
+            <type>nar</type>
+        </dependency>
         <dependency>
             <groupId>egm.io</groupId>
             <artifactId>nifi-ngsild-postgresql-processors</artifactId>
