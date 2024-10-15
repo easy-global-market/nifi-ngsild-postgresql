@@ -235,18 +235,18 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                         final PreparedStatement stmt = enclosure.getCachedStatement(conn);
                         JdbcCommon.setParameters(stmt, flowFile.getAttributes());
                         try {
-                            getLogger().info("Gonna create schema {}", schemaName);
+                            getLogger().debug("Gonna create schema {}", schemaName);
                             conn.createStatement().execute(postgres.createSchema(schemaName));
-                            getLogger().info("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
+                            getLogger().debug("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
                             conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
                             ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
                             Map<String, POSTGRESQL_COLUMN_TYPES> newColumns = postgres.getNewColumns(rs, updatedListOfTypedFields);
-                            if (newColumns.size() > 0) {
-                                getLogger().info("Identified new columns to create: {}", newColumns);
+                            if (!newColumns.isEmpty()) {
+                                getLogger().debug("Identified new columns to create: {}", newColumns);
                                 conn.createStatement().execute(postgres.addColumns(schemaName, tableName, newColumns));
                             }
                         } catch (SQLException s) {
-                            getLogger().error(s.toString(), s);
+                            getLogger().error("Error when preparing schema: {}", s.toString(), s);
                         }
                         stmt.addBatch();
                     }, onFlowFileError(context, session, result))) {
@@ -255,7 +255,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     enclosure.addFlowFile(flowFile);
                 }
             } catch (Exception e) {
-                getLogger().error(e.toString(), e);
+                getLogger().error("Unexpected exception processing flow file: {}", e.toString(), e);
             }
         }
     };
