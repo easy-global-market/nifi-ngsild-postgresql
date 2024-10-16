@@ -401,7 +401,11 @@ public class PostgreSQLBackend {
         List<String> valuesForInsert =
             this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, flattenObservations);
 
-        return "insert into " + schemaName + "." + tableName + " " + this.getFieldsForInsert(listOfFields.keySet()) + " values " + String.join(",", valuesForInsert) + ";";
+        if (valuesForInsert.isEmpty()) {
+            logger.warn("Unable to get values to insert for {}, returning fake statement", entity.entityId);
+            return "select 1;";
+        } else
+            return "insert into " + schemaName + "." + tableName + " " + this.getFieldsForInsert(listOfFields.keySet()) + " values " + String.join(",", valuesForInsert) + ";";
     }
 
     public String checkColumnNames(String tableName) {
