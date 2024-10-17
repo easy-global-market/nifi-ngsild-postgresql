@@ -137,7 +137,7 @@ public class NGSIUtils {
                         addAttributeIfValid(subAttributes, subAttribute);
                     }
                 } else if (object instanceof JSONObject) {
-                    Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, value.getJSONObject(keyOne));
+                    Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, value.getJSONObject(keyOne)); 
                     addAttributeIfValid(subAttributes, subAttribute);
                 } else {
                     logger.warn("Sub Attribute {} has unexpected value type: {}", keyOne, object.getClass());
@@ -150,6 +150,10 @@ public class NGSIUtils {
                 "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
             );
             subAttributes.add(parameterName);
+            Attribute parameterDatasetId = new Attribute(
+                "datasetid", "Property", "", "", "", "", datasetId.toLowerCase(), false, null
+            );
+            subAttributes.add(parameterDatasetId);
             return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
         } else {
             return new Attribute(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
