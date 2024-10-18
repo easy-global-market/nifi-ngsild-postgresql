@@ -68,10 +68,10 @@ public class TestNGSIUtils {
         // the entity under test has four observations
         assertEquals(4, measureAttributes.size());
         Attribute measureAttribute = measureAttributes.get(0);
-        // each observation should have two sub-attributes: parametername and unitcode
-        assertEquals(2, measureAttribute.subAttrs.size());
+        // each observation should have three sub-attributes: parametername, unitcode and datasetId
+        assertEquals(3, measureAttribute.subAttrs.size());
         assertTrue(measureAttribute.subAttrs.stream().allMatch(attribute ->
-            attribute.getAttrName().equals("parametername") || attribute.getAttrName().equals("unitcode")
+            attribute.getAttrName().equals("parametername") || attribute.getAttrName().equals("unitcode") || attribute.getAttrName().equals("datasetid")
         ));
     }
 }

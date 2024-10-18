@@ -37,12 +37,13 @@ public class TestPostgreSQLBackend {
 
         Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> typedFields =
             postgreSQLBackend.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
-        assertEquals(26, typedFields.size());
+        assertEquals(27, typedFields.size());
         Set<String> keys = typedFields.keySet();
         assertTrue(keys.contains(GENERIC_MEASURE));
         assertTrue(keys.contains(GENERIC_MEASURE + "_observedat"));
         assertTrue(keys.contains(GENERIC_MEASURE + "_unitcode"));
         assertTrue(keys.contains(GENERIC_MEASURE + "_parametername"));
+        assertTrue(keys.contains(GENERIC_MEASURE + "_datasetid"));
     }
 
     @ParameterizedTest
