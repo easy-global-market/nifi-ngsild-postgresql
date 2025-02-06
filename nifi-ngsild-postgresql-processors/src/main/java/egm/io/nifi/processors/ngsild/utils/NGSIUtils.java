@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
 
@@ -42,8 +43,18 @@ public class NGSIUtils {
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
             String entityId = temporalEntity.getString("id");
-            String entityType = temporalEntity.getString("type");
-            logger.debug("Dealing with entity {} of type {}", entityId, entityType);
+            String entityType;
+            if (temporalEntity.get("type") instanceof JSONArray) {
+                List<String> allTypes = temporalEntity.getJSONArray("type")
+                    .toList()
+                    .stream().map(type -> (String) type)
+                    .sorted()
+                    .collect(Collectors.toList());
+                entityType = String.join("_", allTypes);
+            } else {
+                entityType = temporalEntity.getString("type");
+            }
+            logger.debug("Dealing with entity {} of type(s) {}", entityId, entityType);
             List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
