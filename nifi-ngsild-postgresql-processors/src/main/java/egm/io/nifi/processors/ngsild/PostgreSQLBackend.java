@@ -69,6 +69,8 @@ public class PostgreSQLBackend {
                 aggregation.put(encodedGeometry, POSTGRESQL_COLUMN_TYPES.GEOMETRY);
                 aggregation.put(encodedGeoJson, POSTGRESQL_COLUMN_TYPES.TEXT);
                 aggregation.put(attrName, POSTGRESQL_COLUMN_TYPES.TEXT);
+            } else if ("JsonProperty".equals(attribute.getAttrType())) {
+                aggregation.put(attrName, POSTGRESQL_COLUMN_TYPES.JSONB);
             } else
                 aggregation.put(attrName, POSTGRESQL_COLUMN_TYPES.TEXT);
 
@@ -297,6 +299,9 @@ public class PostgreSQLBackend {
                 break;
             case GEOMETRY:
                 formattedField = "ST_GeomFromGeoJSON('" + attributeValue + "')";
+                break;
+            case JSONB:
+                formattedField = "'" + attributeValue + "'";
                 break;
             default:
                 formattedField = "$$" + attributeValue + "$$";
