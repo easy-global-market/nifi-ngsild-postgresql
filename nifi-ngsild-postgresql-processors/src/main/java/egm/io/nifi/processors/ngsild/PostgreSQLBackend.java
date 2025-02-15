@@ -133,7 +133,6 @@ public class PostgreSQLBackend {
     ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
-        Map<String, String> valuesForColumns = new TreeMap<>();
         Map<String, List<Attribute>> attributesByObservedAt =
             entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         List<String> observedTimestamps =
@@ -151,6 +150,7 @@ public class PostgreSQLBackend {
             oldestTimeStamp = observedTimestamps.get(0);
 
         for (String observedTimestamp : observedTimestamps) {
+            Map<String, String> valuesForColumns = new TreeMap<>();
             if (!flattenObservations) {
                 for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
                     Map<String, String> attributesValues =
