@@ -193,7 +193,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                             context.getProperty(DATA_MODEL).getValue(),
                             context.getProperty(ENABLE_ENCODING).asBoolean(),
                             context.getProperty(ENABLE_LOWERCASE).asBoolean(),
-                            flowFile.getAttribute(TABLE_NAME_SUFFIX)
+                            flowFile.getAttribute(TABLE_NAME_SUFFIX).toLowerCase()
                         );
 
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =

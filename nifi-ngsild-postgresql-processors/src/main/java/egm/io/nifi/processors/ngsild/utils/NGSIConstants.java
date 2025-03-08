@@ -28,7 +28,8 @@ public final class NGSIConstants {
         TIMETZ,
         DATE,
         NUMERIC,
-        GEOMETRY
+        GEOMETRY,
+        JSONB
     }
 
 

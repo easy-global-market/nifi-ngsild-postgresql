@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
 
@@ -18,7 +19,7 @@ public class NGSIUtils {
     private static final Logger logger = LoggerFactory.getLogger(NGSIUtils.class);
 
     public static List<String> IGNORED_KEYS_ON_ATTRIBUTES =
-        List.of("type", "value", "object", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
+        List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "@context", "createdAt", "modifiedAt");
 
     public NGSIEvent getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
@@ -42,8 +43,18 @@ public class NGSIUtils {
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
             String entityId = temporalEntity.getString("id");
-            String entityType = temporalEntity.getString("type");
-            logger.debug("Dealing with entity {} of type {}", entityId, entityType);
+            String entityType;
+            if (temporalEntity.get("type") instanceof JSONArray) {
+                List<String> allTypes = temporalEntity.getJSONArray("type")
+                    .toList()
+                    .stream().map(type -> (String) type)
+                    .sorted()
+                    .collect(Collectors.toList());
+                entityType = String.join("_", allTypes);
+            } else {
+                entityType = temporalEntity.getString("type");
+            }
+            logger.debug("Dealing with entity {} of type(s) {}", entityId, entityType);
             List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
@@ -91,6 +102,8 @@ public class NGSIUtils {
             attrValue = value.opt("value");
         } else if ("GeoProperty".contentEquals(attrType)) {
             attrValue = value;
+        } else if ("JsonProperty".contentEquals(attrType)) {
+            attrValue = value.getJSONObject("json");
         } else if ("".contentEquals(attrType)) {
             attrType = null;
             attrValue = null;
@@ -171,6 +184,8 @@ public class NGSIUtils {
         } else if ("Property".contentEquals(subAttrType)) {
             subAttrValue = value.get("value");
         } else if ("GeoProperty".contentEquals(subAttrType)) {
+            subAttrValue = value.get("value").toString();
+        } else if ("JsonProperty".contentEquals(subAttrType)) {
             subAttrValue = value.get("value").toString();
         }
 
