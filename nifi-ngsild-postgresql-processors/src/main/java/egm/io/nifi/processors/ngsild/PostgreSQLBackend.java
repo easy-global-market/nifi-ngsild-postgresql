@@ -76,7 +76,7 @@ public class PostgreSQLBackend {
 
             logger.debug("Added {} in the list of fields for entity {}", attrName, entity.entityId);
 
-            if (!attribute.observedAt.equals("")) {
+            if (!attribute.observedAt.isEmpty()) {
                 String encodedObservedAt = encodeTimePropertyToColumnName(attrName, NGSIConstants.OBSERVED_AT);
                 aggregation.put(encodedObservedAt, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
             } else if (exportSysAttrs) {
@@ -141,7 +141,7 @@ public class PostgreSQLBackend {
                 .collect(Collectors.toList());
 
         String oldestTimeStamp;
-        if (observedTimestamps.get(0).equals("")) {
+        if (observedTimestamps.get(0).isEmpty()) {
             if (observedTimestamps.size() > 1)
                 oldestTimeStamp = observedTimestamps.get(1);
             else
@@ -254,13 +254,13 @@ public class PostgreSQLBackend {
             valuesForColumns.put(encodedAttributeName, formatFieldForValueInsert(attribute.getAttrValue(), listOfFields.get(encodedAttributeName)));
         }
 
-        if (!attribute.getObservedAt().equals("")) {
+        if (!attribute.getObservedAt().isEmpty()) {
             String encodedObservedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.OBSERVED_AT);
             valuesForColumns.put(encodedObservedAt, formatFieldForValueInsert(attribute.getObservedAt(), listOfFields.get(encodedObservedAt)));
         } else if (exportSysAttrs) {
             String encodedCreatedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.CREATED_AT);
             if (attribute.createdAt == null ||
-                attribute.createdAt.equals("") ||
+                attribute.createdAt.isEmpty() ||
                 ZonedDateTime.parse(attribute.createdAt).toEpochSecond() > ZonedDateTime.parse(oldestTimeStamp).toEpochSecond()
             ) {
                 valuesForColumns.put(encodedCreatedAt, formatFieldForValueInsert(oldestTimeStamp, listOfFields.get(encodedCreatedAt)));
@@ -268,7 +268,7 @@ public class PostgreSQLBackend {
                 valuesForColumns.put(encodedCreatedAt, formatFieldForValueInsert(attribute.createdAt, listOfFields.get(encodedCreatedAt)));
 
             String encodedModifiedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.MODIFIED_AT);
-            if (attribute.modifiedAt != null && !attribute.modifiedAt.equals("")) {
+            if (attribute.modifiedAt != null && !attribute.modifiedAt.isEmpty()) {
                 valuesForColumns.put(encodedModifiedAt, formatFieldForValueInsert(attribute.modifiedAt, listOfFields.get(encodedModifiedAt)));
             }
         }
@@ -295,13 +295,11 @@ public class PostgreSQLBackend {
             case TIMESTAMPTZ:
             case DATE:
             case TIMETZ:
+            case JSONB:
                 formattedField = "'" + attributeValue + "'";
                 break;
             case GEOMETRY:
                 formattedField = "ST_GeomFromGeoJSON('" + attributeValue + "')";
-                break;
-            case JSONB:
-                formattedField = "'" + attributeValue + "'";
                 break;
             default:
                 formattedField = "$$" + attributeValue + "$$";
@@ -331,14 +329,14 @@ public class PostgreSQLBackend {
     }
 
     public String buildSchemaName(String service, boolean enableEncoding, boolean enableLowercase) throws Exception {
-        String dbName = "";
+        String dbName;
         if (enableEncoding) {
             dbName = NGSICharsets.encodePostgreSQL((enableLowercase) ? service.toLowerCase() : service);
         } else {
             dbName = NGSICharsets.encode((enableLowercase) ? service.toLowerCase() : service, false, true);
         } // if else
         if (dbName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building database name '" + dbName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
+            logger.error("Building database name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, dbName);
             throw new Exception("Building database name '" + dbName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
         } // if
         return dbName;
@@ -386,7 +384,7 @@ public class PostgreSQLBackend {
         } // if else
 
         if (tableName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building table name '" + tableName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
+            logger.error("Building table name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, tableName);
             throw new Exception("Building table name '" + tableName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
         } // if
         return tableName;
