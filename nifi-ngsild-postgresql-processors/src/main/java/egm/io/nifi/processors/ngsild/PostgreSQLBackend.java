@@ -107,19 +107,25 @@ public class PostgreSQLBackend {
     }
 
     private String encodeAttributeToColumnName(String attributeName, String datasetId, String datasetIdPrefixToTruncate) {
-        String encodedName = NGSIEncoders.encodePostgreSQL(attributeName) + (!datasetId.equals("") ? "_" + NGSIEncoders.encodePostgreSQL(datasetId.replaceFirst(datasetIdPrefixToTruncate, "")) : "");
-        return NGSIEncoders.truncateToMaxSize(encodedName).toLowerCase();
+        // For too long dataset ids, truncate to 32 (not perfect, nor totally bulletproof)
+        String datasetIdEncodedValue =
+            (!datasetId.isEmpty() ?
+                "_" + NGSIEncoders.encodePostgreSQL(NGSIEncoders.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)):
+                ""
+            );
+        String encodedName = NGSIEncoders.encodePostgreSQL(attributeName) + datasetIdEncodedValue;
+        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     private String encodeTimePropertyToColumnName(String encodedAttributeName, String timeProperty) {
         String encodedName = encodedAttributeName + "_" + NGSIEncoders.encodePostgreSQL(timeProperty);
-        return NGSIEncoders.truncateToMaxSize(encodedName).toLowerCase();
+        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     private String encodeSubAttributeToColumnName(String attributeName, String datasetId, String subAttributeName, String datasetIdPrefixToTruncate) {
         String encodedAttributeName = encodeAttributeToColumnName(attributeName, datasetId, datasetIdPrefixToTruncate);
         String encodedName = encodedAttributeName + "_" + NGSIEncoders.encodePostgreSQL(subAttributeName);
-        return NGSIEncoders.truncateToMaxSize(encodedName).toLowerCase();
+        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     public List<String> getValuesForInsert(
