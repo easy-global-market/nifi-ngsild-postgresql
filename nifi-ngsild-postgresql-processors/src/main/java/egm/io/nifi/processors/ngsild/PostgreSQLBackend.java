@@ -140,10 +140,16 @@ public class PostgreSQLBackend {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
         Map<String, List<Attribute>> attributesByObservedAt =
-            entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
+            entity.getEntityAttrs().stream()
+                .collect(Collectors.groupingBy(attrs -> attrs.observedAt));
         List<String> observedTimestamps =
             attributesByObservedAt.keySet().stream()
                 .sorted()
+                .collect(Collectors.toList());
+        // get all the attributes without an observedAt timestamp to inject them as is in each row
+        List<Attribute> attributesWithoutObservedAt =
+            entity.getEntityAttrs().stream()
+                .filter(attribute -> attribute.observedAt == null || attribute.observedAt.isEmpty())
                 .collect(Collectors.toList());
 
         String oldestTimeStamp;
@@ -159,6 +165,12 @@ public class PostgreSQLBackend {
             Map<String, String> valuesForColumns = new TreeMap<>();
             if (!flattenObservations) {
                 for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
+                    Map<String, String> attributesValues =
+                        insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
+                    valuesForColumns.putAll(attributesValues);
+                }
+                for (Attribute attribute : attributesWithoutObservedAt) {
                     Map<String, String> attributesValues =
                         insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
                             creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
