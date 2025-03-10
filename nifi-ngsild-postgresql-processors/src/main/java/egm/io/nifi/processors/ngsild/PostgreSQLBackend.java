@@ -29,7 +29,8 @@ public class PostgreSQLBackend {
         Entity entity,
         String datasetIdPrefixToTruncate,
         Boolean exportSysAttrs,
-        Set<String> ignoredAttributes) {
+        Set<String> ignoredAttributes
+    ) {
         Map<String, POSTGRESQL_COLUMN_TYPES> aggregation = new TreeMap<>();
 
         Map<String, List<Attribute>> attributesByObservedAt =
@@ -38,6 +39,9 @@ public class PostgreSQLBackend {
         aggregation.put(NGSIConstants.RECV_TIME, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
         aggregation.put(NGSIConstants.ENTITY_ID, POSTGRESQL_COLUMN_TYPES.TEXT);
         aggregation.put(NGSIConstants.ENTITY_TYPE, POSTGRESQL_COLUMN_TYPES.TEXT);
+        if (entity.getScopes() != null) {
+            aggregation.put(NGSIConstants.ENTITY_SCOPES, POSTGRESQL_COLUMN_TYPES.ARRAY);
+        }
 
         List<Attribute> attributes = new ArrayList<>();
         attributesByObservedAt.forEach((timestamp, attributesLd) -> attributesLd.forEach(attribute -> {
@@ -241,6 +245,8 @@ public class PostgreSQLBackend {
         valuesForColumns.put(NGSIConstants.RECV_TIME, "'" + DateTimeFormatter.ISO_INSTANT.format(creationDate) + "'");
         valuesForColumns.put(NGSIConstants.ENTITY_ID, "'" + entity.getEntityId() + "'");
         valuesForColumns.put(NGSIConstants.ENTITY_TYPE, "'" + entity.getEntityType() + "'");
+        if (entity.getScopes() != null)
+            valuesForColumns.put(NGSIConstants.ENTITY_SCOPES, "'{" + String.join(",", entity.getScopes()) + "}'");
 
         if ("GeoProperty".equals(attribute.getAttrType())) {
             JSONObject geoProppertyObject = (JSONObject) attribute.getAttrValue();

@@ -138,7 +138,7 @@ public class TestNgsiLdToPostgreSQL {
         Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
         Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
         String dataModel = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.DATA_MODEL).getValue();
-        Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType", null);
+        Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType", null, null);
 
         try {
             String tableName = backend.buildTableName(entity, dataModel, enableEncoding, enableLowercase, null);
@@ -156,7 +156,7 @@ public class TestNgsiLdToPostgreSQL {
 
         ArrayList<Attribute> entityAttrs = new ArrayList<>();
         entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Entity entity = new Entity("someId", "someType", null, entityAttrs);
 
         try {
             Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
@@ -181,13 +181,42 @@ public class TestNgsiLdToPostgreSQL {
     } // testRowFields
 
     @Test
+    public void testExportScopeAttribute() {
+        ArrayList<Attribute> entityAttrs = new ArrayList<>();
+        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
+        Entity entity = new Entity("someId", "someType", Set.of("S_UseCase/S_Instance"), entityAttrs);
+
+        try {
+            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
+            Set<String> expectedListOfFields = Set.of("entityId", "entityType", "scopes", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
+
+            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, 1562561734983L, "", false, false, false);
+            try {
+                assertTrue(valuesForInsert.get(0).contains("'{S_UseCase/S_Instance}'"));
+                assertEquals(expectedListOfFields, listOfFields.keySet());
+                System.out.println("[PostgreSQLBackend.listOfFields]"
+                    + "-  OK  - '" + listOfFields + "' is equals to the expected output");
+            } catch (AssertionError e) {
+                System.out.println("[PostgreSQLBackend.listOfFields]"
+                    + "- FAIL - '" + listOfFields + "' is not equals to the expected output");
+                throw e;
+            } // try catch
+        } catch (Exception e) {
+            System.out.println("[PostgreSQLBackend.listOfFields]"
+                + "- FAIL - There was some problem when building the list of fields");
+            throw e;
+        } // try catch
+
+    } // testRowFields
+
+    @Test
     public void testValuesForInsertRowWithMetadata() {
         System.out.println("[PostgreSQLBackend.getValuesForInsert]"
             + "-------- When attrPersistence is column");
 
         ArrayList<Attribute> entityAttrs = new ArrayList<>();
         entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Entity entity = new Entity("someId", "someType", null, entityAttrs);
         long creationTime = 1562561734983L;
 
         try {
@@ -217,7 +246,7 @@ public class TestNgsiLdToPostgreSQL {
         ArrayList<Attribute> entityAttrs = new ArrayList<>();
         entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
         entityAttrs.add(new Attribute("ignoredAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Entity entity = new Entity("someId", "someType", null, entityAttrs);
         Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr", "anotherIgnoredAttr"));
         long creationTime = 1562561734983L;
 
@@ -242,7 +271,7 @@ public class TestNgsiLdToPostgreSQL {
         Attribute subAttribute =
             new Attribute("ignoredSubAttr", "Property", null, null, null, null, 12.0, false, new ArrayList<>());
         entityAttrs.add(new Attribute("anotherAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, true, Collections.singletonList(subAttribute)));
-        Entity entity = new Entity("someId", "someType", entityAttrs);
+        Entity entity = new Entity("someId", "someType", null, entityAttrs);
         Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr", "ignoredSubAttr"));
         long creationTime = 1562561734983L;
 
