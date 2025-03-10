@@ -6,6 +6,7 @@ public final class NGSIConstants {
     public static final String RECV_TIME = "recvTime";
     public static final String ENTITY_ID = "entityId";
     public static final String ENTITY_TYPE = "entityType";
+    public static final String ENTITY_SCOPES = "scopes";
 
     // NGSIPostgreSQLSink specific constants
     // http://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
@@ -29,7 +30,8 @@ public final class NGSIConstants {
         DATE,
         NUMERIC,
         GEOMETRY,
-        JSONB
+        JSONB,
+        ARRAY
     }
 
 

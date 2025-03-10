@@ -44,7 +44,8 @@ public class NGSIUtils {
             JSONObject temporalEntity = content.getJSONObject(i);
             String entityId = temporalEntity.getString("id");
             String entityType = parseEntityTypes(temporalEntity);
-            logger.debug("Dealing with entity {} of type(s) {}", entityId, entityType);
+            Set<String> scopes = parseEntityScopes(temporalEntity);
+            logger.debug("Dealing with entity {} of type(s) {} in scope(s) {}", entityId, entityType, scopes);
 
             List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
@@ -70,9 +71,22 @@ public class NGSIUtils {
                 }
             }
 
-            entities.add(new Entity(entityId, entityType, attributes));
+            entities.add(new Entity(entityId, entityType, scopes, attributes));
         }
         return entities;
+    }
+
+    private Set<String> parseEntityScopes(JSONObject temporalEntity) {
+        if (!temporalEntity.has("scope")) {
+            return null;
+        } else if (temporalEntity.get("scope") instanceof JSONArray) {
+            return temporalEntity.getJSONArray("scope")
+                .toList().stream()
+                .map(scope -> (String) scope)
+                .collect(Collectors.toSet());
+        } else {
+            return Set.of(temporalEntity.getString("scope"));
+        }
     }
 
     private String parseEntityTypes(JSONObject temporalEntity) {
