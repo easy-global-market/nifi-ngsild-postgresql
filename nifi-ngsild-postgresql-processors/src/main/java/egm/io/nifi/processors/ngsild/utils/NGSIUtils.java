@@ -43,18 +43,9 @@ public class NGSIUtils {
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
             String entityId = temporalEntity.getString("id");
-            String entityType;
-            if (temporalEntity.get("type") instanceof JSONArray) {
-                List<String> allTypes = temporalEntity.getJSONArray("type")
-                    .toList()
-                    .stream().map(type -> (String) type)
-                    .sorted()
-                    .collect(Collectors.toList());
-                entityType = String.join("_", allTypes);
-            } else {
-                entityType = temporalEntity.getString("type");
-            }
+            String entityType = parseEntityTypes(temporalEntity);
             logger.debug("Dealing with entity {} of type(s) {}", entityId, entityType);
+
             List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
@@ -82,6 +73,18 @@ public class NGSIUtils {
             entities.add(new Entity(entityId, entityType, attributes));
         }
         return entities;
+    }
+
+    private String parseEntityTypes(JSONObject temporalEntity) {
+        if (temporalEntity.get("type") instanceof JSONArray) {
+            return temporalEntity.getJSONArray("type")
+                .toList()
+                .stream().map(type -> (String) type)
+                .sorted()
+                .collect(Collectors.joining("_"));
+        } else {
+            return temporalEntity.getString("type");
+        }
     }
 
     private Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
