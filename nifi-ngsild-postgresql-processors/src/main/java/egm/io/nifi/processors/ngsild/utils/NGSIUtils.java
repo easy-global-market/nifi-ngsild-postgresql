@@ -43,18 +43,10 @@ public class NGSIUtils {
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
             String entityId = temporalEntity.getString("id");
-            String entityType;
-            if (temporalEntity.get("type") instanceof JSONArray) {
-                List<String> allTypes = temporalEntity.getJSONArray("type")
-                    .toList()
-                    .stream().map(type -> (String) type)
-                    .sorted()
-                    .collect(Collectors.toList());
-                entityType = String.join("_", allTypes);
-            } else {
-                entityType = temporalEntity.getString("type");
-            }
-            logger.debug("Dealing with entity {} of type(s) {}", entityId, entityType);
+            String entityType = parseEntityTypes(temporalEntity);
+            Set<String> scopes = parseEntityScopes(temporalEntity);
+            logger.debug("Dealing with entity {} of type(s) {} in scope(s) {}", entityId, entityType, scopes);
+
             List<Attribute> attributes = new ArrayList<>();
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
@@ -79,9 +71,34 @@ public class NGSIUtils {
                 }
             }
 
-            entities.add(new Entity(entityId, entityType, attributes));
+            entities.add(new Entity(entityId, entityType, scopes, attributes));
         }
         return entities;
+    }
+
+    private Set<String> parseEntityScopes(JSONObject temporalEntity) {
+        if (!temporalEntity.has("scope")) {
+            return null;
+        } else if (temporalEntity.get("scope") instanceof JSONArray) {
+            return temporalEntity.getJSONArray("scope")
+                .toList().stream()
+                .map(scope -> (String) scope)
+                .collect(Collectors.toSet());
+        } else {
+            return Set.of(temporalEntity.getString("scope"));
+        }
+    }
+
+    private String parseEntityTypes(JSONObject temporalEntity) {
+        if (temporalEntity.get("type") instanceof JSONArray) {
+            return temporalEntity.getJSONArray("type")
+                .toList()
+                .stream().map(type -> (String) type)
+                .sorted()
+                .collect(Collectors.joining("_"));
+        } else {
+            return temporalEntity.getString("type");
+        }
     }
 
     private Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
