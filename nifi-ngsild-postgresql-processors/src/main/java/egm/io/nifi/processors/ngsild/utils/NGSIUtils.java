@@ -20,7 +20,7 @@ public class NGSIUtils {
 
     public static List<String> IGNORED_KEYS_ON_ATTRIBUTES =
         List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
-    public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "@context", "createdAt", "modifiedAt");
+    public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
 
     public NGSIEvent getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
 
