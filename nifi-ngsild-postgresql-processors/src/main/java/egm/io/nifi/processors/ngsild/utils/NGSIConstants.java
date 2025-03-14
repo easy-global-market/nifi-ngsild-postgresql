@@ -31,7 +31,14 @@ public final class NGSIConstants {
         NUMERIC,
         GEOMETRY,
         JSONB,
-        ARRAY
+        ARRAY;
+
+        public String getPostgresType() {
+            if (this == POSTGRESQL_COLUMN_TYPES.ARRAY) {
+                return "text[]";
+            }
+            return this.name();
+        }
     }
 
 
