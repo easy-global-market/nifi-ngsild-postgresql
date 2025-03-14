@@ -139,6 +139,7 @@ public class NGSIUtils {
                 JSONObject relation = value.getJSONObject(keyOne);
                 relation.remove("id");
                 relation.remove("type");
+                relation.remove("scope");
 
                 for (String relationKey : relation.keySet()) {
                     Object object = relation.get(relationKey);
