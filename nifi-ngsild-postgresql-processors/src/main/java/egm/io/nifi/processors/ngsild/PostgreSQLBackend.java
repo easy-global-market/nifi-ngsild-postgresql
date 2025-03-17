@@ -338,10 +338,10 @@ public class PostgreSQLBackend {
         while (it.hasNext()) {
             Map.Entry<String, POSTGRESQL_COLUMN_TYPES> entry = it.next();
             if (first) {
-                fieldsForCreate += entry.getKey() + " " + entry.getValue().name();
+                fieldsForCreate += entry.getKey() + " " + entry.getValue().getPostgresType();
                 first = false;
             } else {
-                fieldsForCreate += "," + entry.getKey() + " " + entry.getValue().name();
+                fieldsForCreate += "," + entry.getKey() + " " + entry.getValue().getPostgresType();
             } // if else
         } // while
 
@@ -448,8 +448,13 @@ public class PostgreSQLBackend {
         try {
             // Get the column names; column indices start from 1
             while (rs.next()) {
+                POSTGRESQL_COLUMN_TYPES postgresqlColumnTypes;
+                if (rs.getString(2).equals("_text"))
+                    postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.ARRAY;
+                else
+                    postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase());
                 Pair<String, POSTGRESQL_COLUMN_TYPES> columnNameWithDataType =
-                    new ImmutablePair<>(rs.getString(1), POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase()));
+                    new ImmutablePair<>(rs.getString(1), postgresqlColumnTypes);
                 if (listOfFields.containsKey(columnNameWithDataType.getKey()) &&
                     listOfFields.get(columnNameWithDataType.getKey()) != columnNameWithDataType.getValue()) {
                     logger.info("Column {} with type {} already existed with a different type {}",
@@ -495,10 +500,10 @@ public class PostgreSQLBackend {
         while (it.hasNext()) {
             Map.Entry<String, POSTGRESQL_COLUMN_TYPES> entry = it.next();
             if (first) {
-                fieldsForCreate += " ADD COLUMN " + entry.getKey() + " " + entry.getValue().name();
+                fieldsForCreate += " ADD COLUMN " + entry.getKey() + " " + entry.getValue().getPostgresType();
                 first = false;
             } else {
-                fieldsForCreate += ", ADD COLUMN " + entry.getKey() + " " + entry.getValue().name();
+                fieldsForCreate += ", ADD COLUMN " + entry.getKey() + " " + entry.getValue().getPostgresType();
             } // if else
         } // while
 
