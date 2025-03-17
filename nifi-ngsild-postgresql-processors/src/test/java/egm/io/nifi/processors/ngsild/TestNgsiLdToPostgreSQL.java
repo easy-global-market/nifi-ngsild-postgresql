@@ -26,7 +26,6 @@ public class TestNgsiLdToPostgreSQL {
         //Mock the DBCP Controller Service, so we can control the Results
         runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
         runner.setProperty(NgsiLdToPostgreSQL.CONNECTION_POOL, "dbcp");
-        runner.setProperty(NgsiLdToPostgreSQL.DATA_MODEL, "db-by-entity-type");
         runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
         runner.setProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE, "false");
         runner.setProperty(NgsiLdToPostgreSQL.BATCH_SIZE, "100");
@@ -133,15 +132,12 @@ public class TestNgsiLdToPostgreSQL {
         System.out.println("[NGSIToPostgreSQL.buildTableName]"
             + "-------- When data model is by entity, a table name length greater than 63 characters is truncated");
 
-        runner.setProperty(NgsiLdToPostgreSQL.DATA_MODEL, "db-by-entity");
         runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
         Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
-        String dataModel = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.DATA_MODEL).getValue();
         Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType", null, null);
 
         try {
-            String tableName = backend.buildTableName(entity, dataModel, enableEncoding, enableLowercase, null);
+            String tableName = backend.buildTableName(entity, enableLowercase, null);
             assertTrue(tableName.length() < 63);
         } catch (Exception e) {
             fail("[NGSIToPostgreSQL.buildTableName]"

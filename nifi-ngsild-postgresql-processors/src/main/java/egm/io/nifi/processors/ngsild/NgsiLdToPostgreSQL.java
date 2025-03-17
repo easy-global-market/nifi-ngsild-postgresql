@@ -49,16 +49,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .identifiesControllerService(DBCPService.class)
         .required(true)
         .build();
-    protected static final PropertyDescriptor DATA_MODEL = new PropertyDescriptor.Builder()
-        .name("data-model")
-        .displayName("Data Model")
-        .description("The Data model for creating the tables when an event have been received you can choose between" +
-            ": db-by-entity or db-by-entity-type, default value is db-by-entity")
-        .required(false)
-        .allowableValues("db-by-entity", "db-by-entity-type")
-        .defaultValue("db-by-entity-type")
-        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-        .build();
     protected static final PropertyDescriptor DEFAULT_TENANT = new PropertyDescriptor.Builder()
         .name("default-tenant")
         .displayName("Default NGSI-LD Tenant")
@@ -190,8 +180,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     String tableName =
                         postgres.buildTableName(
                             entity,
-                            context.getProperty(DATA_MODEL).getValue(),
-                            context.getProperty(ENABLE_ENCODING).asBoolean(),
                             context.getProperty(ENABLE_LOWERCASE).asBoolean(),
                             flowFile.getAttribute(TABLE_NAME_SUFFIX).toLowerCase()
                         );
@@ -341,7 +329,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         final List<PropertyDescriptor> properties = new ArrayList<>();
         properties.add(CONNECTION_POOL);
-        properties.add(DATA_MODEL);
         properties.add(DEFAULT_TENANT);
         properties.add(DATASETID_PREFIX_TRUNCATE);
         properties.add(ENABLE_ENCODING);

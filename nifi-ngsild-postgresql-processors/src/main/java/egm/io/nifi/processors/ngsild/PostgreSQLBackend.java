@@ -374,43 +374,18 @@ public class PostgreSQLBackend {
         return "create table if not exists " + schemaName + "." + tableName + " " + getFieldsForCreate(listOfFields) + ";";
     }
 
-    public String buildTableName(Entity entity, String dataModel, boolean enableEncoding, boolean enableLowercase, String attributeTableName) throws Exception {
-        String tableName = "";
-        String entityId = (enableLowercase) ? entity.getEntityId().toLowerCase() : entity.getEntityId();
+    public String buildTableName(Entity entity, boolean enableLowercase, String tableNameSuffix) throws Exception {
+        String tableName;
         String entityType = (enableLowercase) ? entity.getEntityType().toLowerCase() : entity.getEntityType();
 
-        if (enableEncoding) {
-            switch (dataModel) {
-                case "db-by-entity":
-                    tableName = NGSICharsets.encodePostgreSQL(entityId);
-                    break;
-                case "db-by-entity-type":
-                    if (attributeTableName != null && !attributeTableName.isEmpty())
-                        tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + attributeTableName;
-                    else tableName = NGSICharsets.encodePostgreSQL(entityType);
-                    break;
-                default:
-                    System.out.println("Unknown data model '" + dataModel + "'. Please, use DMBYENTITY or DMBYENTITYTYPE");
-            } // switch
-        } else {
-            switch (dataModel) {
-                case "db-by-entity":
-                    tableName = NGSIEncoders.encodePostgreSQL(entityId);
-                    break;
-                case "db-by-entity-type":
-                    if (attributeTableName != null && !attributeTableName.isEmpty())
-                        tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + attributeTableName;
-                    else tableName = NGSICharsets.encodePostgreSQL(entityType);
-                    break;
-                default:
-                    System.out.println("Unknown data model '" + dataModel + "'. Please, use DMBYENTITY or DMBYENTITYTYPE");
-            } // switch
-        } // if else
+        if (tableNameSuffix != null && !tableNameSuffix.isEmpty())
+            tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + tableNameSuffix;
+        else tableName = NGSICharsets.encodePostgreSQL(entityType);
 
         if (tableName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
             logger.error("Building table name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, tableName);
             throw new Exception("Building table name '" + tableName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
-        } // if
+        }
         return tableName;
     }
 
