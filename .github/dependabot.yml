@@ -19,3 +19,5 @@ updates:
       interval: "weekly"
     assignees:
       - "bobeal"
+    target-branch: "develop"
+
