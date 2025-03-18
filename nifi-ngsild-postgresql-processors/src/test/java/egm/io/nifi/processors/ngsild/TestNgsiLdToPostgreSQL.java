@@ -18,87 +18,48 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 public class TestNgsiLdToPostgreSQL {
-    private TestRunner runner;
     private PostgreSQLBackend backend;
 
     @BeforeEach
     public void setUp() {
-        //Mock the DBCP Controller Service, so we can control the Results
-        runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
+        // Mock the DBCP Controller Service, so we can control the Results
+        TestRunner runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
         runner.setProperty(NgsiLdToPostgreSQL.CONNECTION_POOL, "dbcp");
-        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
-        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE, "false");
         runner.setProperty(NgsiLdToPostgreSQL.BATCH_SIZE, "100");
         runner.setProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE, "false");
         backend = new PostgreSQLBackend();
     }
 
     /**
-     * [NGSIToPostgreSQL.buildDBName] -------- The schema name is equals to the encoding of the notified/defaulted
+     * [NGSIToPostgreSQL.buildSchemaName] -------- The schema name is equals to the encoding of the notified/defaulted
      * service.
      */
     @Test
-    public void testBuildDBNameOldEncoding() throws Exception {
-        System.out.println("[NGSIToPostgreSQL.buildDBName]"
-            + "-------- The schema name is equals to the encoding of the notified/defaulted service");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean(); // default
-        String service = "someService";
-
-        try {
-            String builtSchemaName = backend.buildSchemaName(service, enableEncoding, enableLowercase);
-            String expectedDBName = "someService";
-
-            try {
-                assertEquals(expectedDBName, builtSchemaName);
-                System.out.println("[NGSIToPostgreSQL.buildDBName]"
-                    + "-  OK  - '" + expectedDBName + "' is equals to the encoding of <service>");
-            } catch (AssertionError e) {
-                System.out.println("[NGSIToPostgreSQL.buildDBName]"
-                    + "- FAIL - '" + expectedDBName + "' is not equals to the encoding of <service>");
-                throw e;
-            } // try catch
-        } catch (Exception e) {
-            System.out.println("[NGSIToPostgreSQL.buildDBName]"
-                + "- FAIL - There was some problem when building the DB name");
-            throw e;
-        } // try catch
-    } // testBuildDBNameOldEncoding
-
-    /**
-     * [NGSIToPostgreSQL.buildDBName] -------- The schema name is equals to the encoding of the notified/defaulted
-     * service.
-     */
-    @Test
-    public void testBuildDBNameNewEncoding() throws Exception {
-        System.out.println("[NGSIToPostgreSQL.buildDBName]"
+    public void testBuildSchemaName() throws Exception {
+        System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
             + "-------- The schema name is equals to the encoding of the notified/defaulted service");
 
         String service = "someService";
-        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "true");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
-
 
         try {
-            String builtSchemaName = backend.buildSchemaName(service, enableEncoding, enableLowercase);
-            String expectedDBName = "somex0053ervice";
+            String builtSchemaName = backend.buildSchemaName(service);
+            String expectedSchemaName = "someservice";
 
             try {
-                assertEquals(expectedDBName, builtSchemaName);
-                System.out.println("[NGSIToPostgreSQL.buildDBName]"
-                    + "-  OK  - '" + expectedDBName + "' is equals to the encoding of <service>");
+                assertEquals(expectedSchemaName, builtSchemaName);
+                System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
+                    + "-  OK  - '" + expectedSchemaName + "' is equals to the encoding of <service>");
             } catch (AssertionError e) {
-                System.out.println("[NGSIToPostgreSQL.buildDBName]"
-                    + "- FAIL - '" + expectedDBName + "' is not equals to the encoding of <service>");
+                System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
+                    + "- FAIL - '" + expectedSchemaName + "' is not equals to the encoding of <service>");
                 throw e;
-            } // try catch
+            }
         } catch (Exception e) {
-            System.out.println("[NGSIToPostgreSQL.buildDBName]"
+            System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
                 + "- FAIL - There was some problem when building the DB name");
             throw e;
-        } // try catch
-    } // testBuildDBNameNewEncoding
+        }
+    }
 
     /**
      * [NGSIToPostgreSQL.buildSchemaName] -------- A schema name length greater than 63 characters is detected.
@@ -108,20 +69,17 @@ public class TestNgsiLdToPostgreSQL {
         System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
             + "-------- A schema name length greater than 63 characters is detected");
 
-        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
-        Boolean enableEncoding = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING).asBoolean();
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
         String service = "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongService";
 
         try {
-            backend.buildSchemaName(service, enableEncoding, enableLowercase);
+            backend.buildSchemaName(service);
             fail("[NGSIToPostgreSQL.buildSchemaName]"
                 + "- FAIL - A schema name length greater than 63 characters has not been detected");
         } catch (Exception e) {
             System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
                 + "-  OK  - A schema name length greater than 63 characters has been detected");
-        } // try catch
-    } // testBuildSchemaNameLength
+        }
+    }
 
     /**
      * [NGSICartoDBSink.buildTableName] -------- When data model is by entity, a table name length greater than 63
@@ -132,12 +90,10 @@ public class TestNgsiLdToPostgreSQL {
         System.out.println("[NGSIToPostgreSQL.buildTableName]"
             + "-------- When data model is by entity, a table name length greater than 63 characters is truncated");
 
-        runner.setProperty(NgsiLdToPostgreSQL.ENABLE_ENCODING, "false");
-        Boolean enableLowercase = runner.getProcessContext().getProperty(NgsiLdToPostgreSQL.ENABLE_LOWERCASE).asBoolean();
         Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType", null, null);
 
         try {
-            String tableName = backend.buildTableName(entity, enableLowercase, null);
+            String tableName = backend.buildTableName(entity, null);
             assertTrue(tableName.length() < 63);
         } catch (Exception e) {
             fail("[NGSIToPostgreSQL.buildTableName]"

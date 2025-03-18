@@ -352,18 +352,13 @@ public class PostgreSQLBackend {
         return "(" + String.join(",", listOfFieldsNames) + ")";
     }
 
-    public String buildSchemaName(String service, boolean enableEncoding, boolean enableLowercase) throws Exception {
-        String dbName;
-        if (enableEncoding) {
-            dbName = NGSICharsets.encodePostgreSQL((enableLowercase) ? service.toLowerCase() : service);
-        } else {
-            dbName = NGSICharsets.encode((enableLowercase) ? service.toLowerCase() : service, false, true);
-        } // if else
-        if (dbName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building database name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, dbName);
-            throw new Exception("Building database name '" + dbName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
-        } // if
-        return dbName;
+    public String buildSchemaName(String tenantName) throws Exception {
+        String schemaName = NGSICharsets.encodePostgreSQL(tenantName.toLowerCase());
+        if (schemaName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
+            logger.error("Building schema name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, schemaName);
+            throw new Exception("Building schema name '" + schemaName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
+        }
+        return schemaName;
     }
 
     public String createSchema(String schemaName) {
@@ -374,9 +369,9 @@ public class PostgreSQLBackend {
         return "create table if not exists " + schemaName + "." + tableName + " " + getFieldsForCreate(listOfFields) + ";";
     }
 
-    public String buildTableName(Entity entity, boolean enableLowercase, String tableNameSuffix) throws Exception {
+    public String buildTableName(Entity entity, String tableNameSuffix) throws Exception {
         String tableName;
-        String entityType = (enableLowercase) ? entity.getEntityType().toLowerCase() : entity.getEntityType();
+        String entityType = entity.getEntityType().toLowerCase();
 
         if (tableNameSuffix != null && !tableNameSuffix.isEmpty())
             tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + tableNameSuffix;

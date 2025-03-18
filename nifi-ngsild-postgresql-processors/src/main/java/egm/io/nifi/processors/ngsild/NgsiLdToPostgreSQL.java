@@ -65,22 +65,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .defaultValue("urn:ngsi-ld:Dataset:")
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
         .build();
-    protected static final PropertyDescriptor ENABLE_ENCODING = new PropertyDescriptor.Builder()
-        .name("enable-encoding")
-        .displayName("Enable Encoding")
-        .description("true or false, true applies the new encoding, false applies the old encoding.")
-        .required(false)
-        .allowableValues("true", "false")
-        .defaultValue("true")
-        .build();
-    protected static final PropertyDescriptor ENABLE_LOWERCASE = new PropertyDescriptor.Builder()
-        .name("enable-lowercase")
-        .displayName("Enable Lowercase")
-        .description("true or false, true for creating the Schema and Tables name with lowercase.")
-        .required(false)
-        .allowableValues("true", "false")
-        .defaultValue("true")
-        .build();
     protected static final PropertyDescriptor EXPORT_SYSATTRS = new PropertyDescriptor.Builder()
         .name("export-sysattrs")
         .displayName("Export Sysattrs")
@@ -166,23 +150,14 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
                     context.getProperty(DEFAULT_TENANT).getValue() : event.getNgsiLdTenant();
             try {
-                final String schemaName =
-                    postgres.buildSchemaName(
-                        ngsiLdTenant,
-                        context.getProperty(ENABLE_ENCODING).asBoolean(),
-                        context.getProperty(ENABLE_LOWERCASE).asBoolean()
-                    );
+                final String schemaName = postgres.buildSchemaName(ngsiLdTenant);
 
                 List<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
                     getLogger().info("Exporting entity " + entity.entityId);
 
                     String tableName =
-                        postgres.buildTableName(
-                            entity,
-                            context.getProperty(ENABLE_LOWERCASE).asBoolean(),
-                            flowFile.getAttribute(TABLE_NAME_SUFFIX).toLowerCase()
-                        );
+                        postgres.buildTableName(entity, flowFile.getAttribute(TABLE_NAME_SUFFIX).toLowerCase());
 
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
                         postgres.listOfFields(
@@ -331,8 +306,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(CONNECTION_POOL);
         properties.add(DEFAULT_TENANT);
         properties.add(DATASETID_PREFIX_TRUNCATE);
-        properties.add(ENABLE_ENCODING);
-        properties.add(ENABLE_LOWERCASE);
         properties.add(EXPORT_SYSATTRS);
         properties.add(IGNORE_EMPTY_OBSERVED_AT);
         properties.add(BATCH_SIZE);
