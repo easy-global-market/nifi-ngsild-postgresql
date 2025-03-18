@@ -15,7 +15,6 @@ import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.dbcp.DBCPService;
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.flowfile.attributes.FragmentAttributes;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -81,13 +80,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .allowableValues("true", "false")
         .defaultValue("true")
         .build();
-    protected static final PropertyDescriptor TRANSACTION_TIMEOUT = new PropertyDescriptor.Builder()
-        .name("Transaction Timeout")
-        .description("If the <Support Fragmented Transactions> property is set to true, specifies how long to wait for all FlowFiles for a particular fragment.identifier attribute "
-            + "to arrive before just transferring all of the FlowFiles with that identifier to the 'failure' relationship")
-        .required(false)
-        .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
-        .build();
     protected static final PropertyDescriptor BATCH_SIZE = new PropertyDescriptor.Builder()
         .name("Batch Size")
         .description("The preferred number of FlowFiles to put to the database in a single transaction")
@@ -95,6 +87,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
         .defaultValue("10")
         .build();
+
     protected static final Relationship REL_SUCCESS = new Relationship.Builder()
         .name("success")
         .description("A FlowFile is routed to this relationship after the database is successfully updated")
@@ -108,13 +101,13 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .description("A FlowFile is routed to this relationship if the database cannot be updated and retrying the operation will also fail, "
             + "such as an invalid query or an integrity constraint violation")
         .build();
+
     private static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
     private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
     private static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
-    private static final String FRAGMENT_ID_ATTR = FragmentAttributes.FRAGMENT_ID.key();
-    private static final String FRAGMENT_INDEX_ATTR = FragmentAttributes.FRAGMENT_INDEX.key();
-    private static final String FRAGMENT_COUNT_ATTR = FragmentAttributes.FRAGMENT_COUNT.key();
+
     private static final PostgreSQLBackend postgres = new PostgreSQLBackend();
+
     private final PartialFunctions.InitConnection<FunctionContext, Connection> initConnection = (c, s, fc, ff) -> {
         final Connection connection = c.getProperty(CONNECTION_POOL).asControllerService(DBCPService.class)
             .getConnection(ff == null ? Collections.emptyMap() : ff.get(0).getAttributes());
@@ -131,11 +124,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
     private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
     private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> {
-        final FlowFilePoll poll = pollFlowFiles(c, s, fc, r);
+        final FlowFilePoll poll = pollFlowFiles(c, s);
         if (poll == null) {
             return null;
         }
-        fc.fragmentedTransaction = poll.isFragmentedTransaction();
         return poll.getFlowFiles();
     };
     private ExceptionHandler<FunctionContext> exceptionHandler;
@@ -494,62 +486,21 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     /**
      * Pulls a batch of FlowFiles from the incoming queues. If no FlowFiles are available, returns <code>null</code>.
      * Otherwise, a List of FlowFiles will be returned.
-     * <p>
-     * If all FlowFiles pulled are not eligible to be processed, the FlowFiles will be penalized and transferred back
-     * to the input queue and an empty List will be returned.
-     * <p>
-     * Otherwise, if the Support Fragmented Transactions property is true, all FlowFiles that belong to the same
-     * transaction will be sorted in the order that they should be evaluated.
-     * <p>
-     * //@param context the process context for determining properties
-     * //@param session the process session for pulling flowfiles
+     *
+     * @param context the process context for determining properties
+     * @param session the process session for pulling flowfiles
      *
      * @return a FlowFilePoll containing a List of FlowFiles to process, or <code>null</code> if there are no FlowFiles to process
      */
-
-
-    private FlowFilePoll pollFlowFiles(final ProcessContext context, final ProcessSession session,
-        final FunctionContext functionContext, final RoutingResult result) {
-        // Determine which FlowFile Filter to use in order to obtain FlowFiles.
-        final boolean useTransactions = false;
-        boolean fragmentedTransaction = false;
-
+    private FlowFilePoll pollFlowFiles(final ProcessContext context, final ProcessSession session) {
         final int batchSize = context.getProperty(BATCH_SIZE).asInteger();
-        List<FlowFile> flowFiles;
-        if (useTransactions) {
-            final TransactionalFlowFileFilter filter = new TransactionalFlowFileFilter();
-            flowFiles = session.get(filter);
-            fragmentedTransaction = filter.isFragmentedTransaction();
-        } else {
-            flowFiles = session.get(batchSize);
-        }
+        List<FlowFile> flowFiles = session.get(batchSize);
 
         if (flowFiles.isEmpty()) {
             return null;
         }
 
-        // If we are supporting fragmented transactions, verify that all FlowFiles are correct
-        if (fragmentedTransaction) {
-            try {
-                if (!isFragmentedTransactionReady(flowFiles, context.getProperty(TRANSACTION_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS))) {
-                    // Not ready, penalize FlowFiles and put it back to self.
-                    flowFiles.forEach(f -> result.routeTo(session.penalize(f), Relationship.SELF));
-                    return null;
-                }
-
-            } catch (IllegalArgumentException e) {
-                // Map relationship based on context, and then let default handler to handle.
-                final ErrorTypes.Result adjustedRoute = adjustError.apply(functionContext, ErrorTypes.InvalidInput);
-                ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY)
-                    .apply(functionContext, () -> flowFiles, adjustedRoute, e);
-                return null;
-            }
-
-            // sort by fragment index.
-            flowFiles.sort(Comparator.comparing(o -> Integer.parseInt(o.getAttribute(FRAGMENT_INDEX_ATTR))));
-        }
-
-        return new FlowFilePoll(flowFiles, fragmentedTransaction);
+        return new FlowFilePoll(flowFiles);
     }
 
     /**
@@ -573,101 +524,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         return null;
     }
-
-    /**
-     * Determines which relationship the given FlowFiles should go to, based on a transaction timing out or
-     * transaction information not being present. If the FlowFiles should be processed and not transferred
-     * to any particular relationship yet, will return <code>null</code>
-     *
-     * @param flowFiles                the FlowFiles whose relationship is to be determined
-     * @param transactionTimeoutMillis the maximum amount of time (in milliseconds) that we should wait
-     *                                 for all FlowFiles in a transaction to be present before routing to failure
-     * @return the appropriate relationship to route the FlowFiles to, or <code>null</code> if the FlowFiles
-     * should instead be processed
-     */
-
-    boolean isFragmentedTransactionReady(final List<FlowFile> flowFiles, final Long transactionTimeoutMillis) throws IllegalArgumentException {
-        int selectedNumFragments = 0;
-        final BitSet bitSet = new BitSet();
-
-        BiFunction<String, Object[], IllegalArgumentException> illegal = (s, objects) -> new IllegalArgumentException(String.format(s, objects));
-
-        for (final FlowFile flowFile : flowFiles) {
-            final String fragmentCount = flowFile.getAttribute(FRAGMENT_COUNT_ATTR);
-            if (fragmentCount == null && flowFiles.size() == 1) {
-                return true;
-            } else if (fragmentCount == null) {
-                throw illegal.apply("Cannot process %s because there are %d FlowFiles with the same fragment.identifier "
-                    + "attribute but not all FlowFiles have a fragment.count attribute", new Object[]{flowFile, flowFiles.size()});
-            }
-
-            final int numFragments;
-            try {
-                numFragments = Integer.parseInt(fragmentCount);
-            } catch (final NumberFormatException nfe) {
-                throw illegal.apply("Cannot process %s because the fragment.count attribute has a value of '%s', which is not an integer",
-                    new Object[]{flowFile, fragmentCount});
-            }
-
-            if (numFragments < 1) {
-                throw illegal.apply("Cannot process %s because the fragment.count attribute has a value of '%s', which is not a positive integer",
-                    new Object[]{flowFile, fragmentCount});
-            }
-
-            if (selectedNumFragments == 0) {
-                selectedNumFragments = numFragments;
-            } else if (numFragments != selectedNumFragments) {
-                throw illegal.apply("Cannot process %s because the fragment.count attribute has different values for different FlowFiles with the same fragment.identifier",
-                    new Object[]{flowFile});
-            }
-
-            final String fragmentIndex = flowFile.getAttribute(FRAGMENT_INDEX_ATTR);
-            if (fragmentIndex == null) {
-                throw illegal.apply("Cannot process %s because the fragment.index attribute is missing", new Object[]{flowFile});
-            }
-
-            final int idx;
-            try {
-                idx = Integer.parseInt(fragmentIndex);
-            } catch (final NumberFormatException nfe) {
-                throw illegal.apply("Cannot process %s because the fragment.index attribute has a value of '%s', which is not an integer",
-                    new Object[]{flowFile, fragmentIndex});
-            }
-
-            if (idx < 0) {
-                throw illegal.apply("Cannot process %s because the fragment.index attribute has a value of '%s', which is not a positive integer",
-                    new Object[]{flowFile, fragmentIndex});
-            }
-
-            if (bitSet.get(idx)) {
-                throw illegal.apply("Cannot process %s because it has the same value for the fragment.index attribute as another FlowFile with the same fragment.identifier",
-                    new Object[]{flowFile});
-            }
-
-            bitSet.set(idx);
-        }
-
-        if (selectedNumFragments == flowFiles.size()) {
-            return true; // no relationship to route FlowFiles to yet - process the FlowFiles.
-        }
-
-        long latestQueueTime = 0L;
-        for (final FlowFile flowFile : flowFiles) {
-            if (flowFile.getLastQueueDate() != null && flowFile.getLastQueueDate() > latestQueueTime) {
-                latestQueueTime = flowFile.getLastQueueDate();
-            }
-        }
-
-        if (transactionTimeoutMillis != null) {
-            if (latestQueueTime > 0L && System.currentTimeMillis() - latestQueueTime > transactionTimeoutMillis) {
-                throw illegal.apply("The transaction timeout has expired for the following FlowFiles; they will be routed to failure: %s", new Object[]{flowFiles});
-            }
-        }
-
-        getLogger().debug("Not enough FlowFiles for transaction. Returning all FlowFiles to queue");
-        return false;  // not enough FlowFiles for this transaction. Return them all to queue.
-    }
-
 
     @FunctionalInterface
     private interface GroupingFunction {
@@ -694,78 +550,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     }
 
     /**
-     * A FlowFileFilter that is responsible for ensuring that the FlowFiles returned either belong
-     * to the same "fragmented transaction" (i.e., 1 transaction whose information is fragmented
-     * across multiple FlowFiles) or that none of the FlowFiles belongs to a fragmented transaction
-     */
-
-    static class TransactionalFlowFileFilter implements FlowFileFilter {
-        private String selectedId = null;
-        private int numSelected = 0;
-        private boolean ignoreFragmentIdentifiers = false;
-
-        public boolean isFragmentedTransaction() {
-            return !ignoreFragmentIdentifiers;
-        }
-
-        @Override
-        public FlowFileFilterResult filter(final FlowFile flowFile) {
-            final String fragmentId = flowFile.getAttribute(FRAGMENT_ID_ATTR);
-            final String fragCount = flowFile.getAttribute(FRAGMENT_COUNT_ATTR);
-
-            // if first FlowFile selected is not part of a fragmented transaction, then
-            // we accept any FlowFile that is also not part of a fragmented transaction.
-            if (ignoreFragmentIdentifiers) {
-                if (fragmentId == null || "1".equals(fragCount)) {
-                    return FlowFileFilterResult.ACCEPT_AND_CONTINUE;
-                } else {
-                    return FlowFileFilterResult.REJECT_AND_CONTINUE;
-                }
-            }
-
-            if (fragmentId == null || "1".equals(fragCount)) {
-                if (selectedId == null) {
-                    // Only one FlowFile in the transaction.
-                    ignoreFragmentIdentifiers = true;
-                    return FlowFileFilterResult.ACCEPT_AND_CONTINUE;
-                } else {
-                    // we've already selected 1 FlowFile, and this one doesn't match.
-                    return FlowFileFilterResult.REJECT_AND_CONTINUE;
-                }
-            }
-
-            if (selectedId == null) {
-                // select this fragment id as the chosen one.
-                selectedId = fragmentId;
-                numSelected++;
-                return FlowFileFilterResult.ACCEPT_AND_CONTINUE;
-            }
-
-            if (selectedId.equals(fragmentId)) {
-                // fragment id's match. Find out if we have all the necessary fragments or not.
-                final int numFragments;
-                if (fragCount != null && JdbcCommon.NUMBER_PATTERN.matcher(fragCount).matches()) {
-                    numFragments = Integer.parseInt(fragCount);
-                } else {
-                    numFragments = Integer.MAX_VALUE;
-                }
-
-                if (numSelected >= numFragments - 1) {
-                    // We have all the fragments we need for this transaction.
-                    return FlowFileFilterResult.ACCEPT_AND_TERMINATE;
-                } else {
-                    // We still need more fragments for this transaction, so accept this one and continue.
-                    numSelected++;
-                    return FlowFileFilterResult.ACCEPT_AND_CONTINUE;
-                }
-            } else {
-                return FlowFileFilterResult.REJECT_AND_CONTINUE;
-            }
-        }
-    }
-
-
-    /**
      * A simple, immutable data structure to hold a List of FlowFiles and an indicator as to whether
      * or not those FlowFiles represent a "fragmented transaction" - that is, a collection of FlowFiles
      * that all must be executed as a single transaction (we refer to it as a fragment transaction
@@ -775,19 +559,13 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private static class FlowFilePoll {
         private final List<FlowFile> flowFiles;
-        private final boolean fragmentedTransaction;
 
-        public FlowFilePoll(final List<FlowFile> flowFiles, final boolean fragmentedTransaction) {
+        public FlowFilePoll(final List<FlowFile> flowFiles) {
             this.flowFiles = flowFiles;
-            this.fragmentedTransaction = fragmentedTransaction;
         }
 
         public List<FlowFile> getFlowFiles() {
             return flowFiles;
-        }
-
-        public boolean isFragmentedTransaction() {
-            return fragmentedTransaction;
         }
     }
 
@@ -798,11 +576,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         public FragmentedEnclosure() {
             super(null);
-        }
-
-        public void addFlowFile(final FlowFile flowFile, final StatementFlowFileEnclosure enclosure) {
-            addFlowFile(flowFile);
-            flowFileToEnclosure.put(flowFile, enclosure);
         }
 
         public StatementFlowFileEnclosure getTargetEnclosure(final FlowFile flowFile) {
