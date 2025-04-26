@@ -12,6 +12,7 @@ public class Attribute {
     public String modifiedAt;
     public boolean hasSubAttrs;
     public List<Attribute> subAttrs;
+
     public Attribute(
         String attrName,
         String attrType,

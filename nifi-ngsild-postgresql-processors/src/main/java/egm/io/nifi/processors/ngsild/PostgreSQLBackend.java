@@ -114,7 +114,7 @@ public class PostgreSQLBackend {
         // For too long dataset ids, truncate to 32 (not perfect, nor totally bulletproof)
         String datasetIdEncodedValue =
             (!datasetId.isEmpty() ?
-                "_" + NGSIEncoders.encodePostgreSQL(NGSIEncoders.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)):
+                "_" + NGSIEncoders.encodePostgreSQL(NGSIEncoders.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)) :
                 ""
             );
         String encodedName = NGSIEncoders.encodePostgreSQL(attributeName) + datasetIdEncodedValue;

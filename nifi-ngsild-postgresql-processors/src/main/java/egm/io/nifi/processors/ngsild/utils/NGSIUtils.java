@@ -181,7 +181,7 @@ public class NGSIUtils {
                 "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
             );
             subAttributes.add(parameterName);
-            if (Objects.equals(datasetId, "")){
+            if (Objects.equals(datasetId, "")) {
                 datasetId = "default";
             }
             Attribute parameterDatasetId = new Attribute(

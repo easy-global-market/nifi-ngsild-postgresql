@@ -121,8 +121,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     };
     private final GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
     };
-    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
-    private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
     private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> {
         final FlowFilePoll poll = pollFlowFiles(c, s);
         if (poll == null) {
@@ -130,6 +128,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
         return poll.getFlowFiles();
     };
+    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
+    private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
     private ExceptionHandler<FunctionContext> exceptionHandler;
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
@@ -489,7 +489,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
      *
      * @param context the process context for determining properties
      * @param session the process session for pulling flowfiles
-     *
      * @return a FlowFilePoll containing a List of FlowFiles to process, or <code>null</code> if there are no FlowFiles to process
      */
     private FlowFilePoll pollFlowFiles(final ProcessContext context, final ProcessSession session) {
