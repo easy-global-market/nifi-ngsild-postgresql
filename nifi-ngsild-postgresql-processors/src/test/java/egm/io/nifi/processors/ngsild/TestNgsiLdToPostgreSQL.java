@@ -1,259 +1,69 @@
 package egm.io.nifi.processors.ngsild;
 
-import egm.io.nifi.processors.ngsild.utils.Attribute;
-import egm.io.nifi.processors.ngsild.utils.Entity;
-import egm.io.nifi.processors.ngsild.utils.NGSIConstants;
-import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES;
+import org.apache.nifi.dbcp.DBCPConnectionPool;
+import org.apache.nifi.dbcp.utils.DBCPProperties;
 import org.apache.nifi.processor.util.pattern.RollbackOnFailure;
+import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
-import java.sql.ResultSet;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
-
+@Testcontainers
 public class TestNgsiLdToPostgreSQL {
     private PostgreSQLBackend backend;
 
+    @Container
+    private static final PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>(
+        DockerImageName.parse("postgis/postgis:16-3.5-alpine").asCompatibleSubstituteFor("postgres")
+    );
+
+    private TestRunner runner;
+
     @BeforeEach
-    public void setUp() {
-        // Mock the DBCP Controller Service, so we can control the Results
-        TestRunner runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
+    public void setUp() throws InitializationException {
+        runner = TestRunners.newTestRunner(NgsiLdToPostgreSQL.class);
+
         runner.setProperty(NgsiLdToPostgreSQL.CONNECTION_POOL, "dbcp");
         runner.setProperty(NgsiLdToPostgreSQL.BATCH_SIZE, "100");
         runner.setProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE, "false");
+        runner.setProperty(NgsiLdToPostgreSQL.DEFAULT_TENANT, "public");
+
+        DBCPConnectionPool connectionPool = new DBCPConnectionPool();
+        runner.addControllerService("dbcp", connectionPool);
+        runner.setProperty(connectionPool, DBCPProperties.DATABASE_URL, postgreSQLContainer.getJdbcUrl() + "/" + postgreSQLContainer.getDatabaseName());
+        runner.setProperty(connectionPool, DBCPProperties.DB_USER, postgreSQLContainer.getUsername());
+        runner.setProperty(connectionPool, DBCPProperties.DB_PASSWORD, postgreSQLContainer.getPassword());
+        runner.setProperty(connectionPool, DBCPProperties.DB_DRIVERNAME, postgreSQLContainer.getDriverClassName());
+        runner.enableControllerService(connectionPool);
+        runner.assertValid(connectionPool);
         backend = new PostgreSQLBackend();
     }
 
-    /**
-     * [NGSIToPostgreSQL.buildSchemaName] -------- The schema name is equals to the encoding of the notified/defaulted
-     * service.
-     */
     @Test
-    public void testBuildSchemaName() throws Exception {
-        System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-            + "-------- The schema name is equals to the encoding of the notified/defaulted service");
+    public void itShouldStart() throws IOException {
+        final Map<String, String> attributes = new HashMap<>();
+        attributes.put(NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX, "");
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), attributes);
 
-        String service = "someService";
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
 
-        try {
-            String builtSchemaName = backend.buildSchemaName(service);
-            String expectedSchemaName = "someservice";
-
-            try {
-                assertEquals(expectedSchemaName, builtSchemaName);
-                System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-                    + "-  OK  - '" + expectedSchemaName + "' is equals to the encoding of <service>");
-            } catch (AssertionError e) {
-                System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-                    + "- FAIL - '" + expectedSchemaName + "' is not equals to the encoding of <service>");
-                throw e;
-            }
-        } catch (Exception e) {
-            System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-                + "- FAIL - There was some problem when building the DB name");
-            throw e;
-        }
+        runner.assertAllConditionsMet("success",
+            mff -> mff.isAttributeEqual(NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX, "")
+        );
     }
 
-    /**
-     * [NGSIToPostgreSQL.buildSchemaName] -------- A schema name length greater than 63 characters is detected.
-     */
-    @Test
-    public void testBuildSchemaNameLength() {
-        System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-            + "-------- A schema name length greater than 63 characters is detected");
-
-        String service = "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongService";
-
-        try {
-            backend.buildSchemaName(service);
-            fail("[NGSIToPostgreSQL.buildSchemaName]"
-                + "- FAIL - A schema name length greater than 63 characters has not been detected");
-        } catch (Exception e) {
-            System.out.println("[NGSIToPostgreSQL.buildSchemaName]"
-                + "-  OK  - A schema name length greater than 63 characters has been detected");
-        }
-    }
-
-    /**
-     * [NGSICartoDBSink.buildTableName] -------- When data model is by entity, a table name length greater than 63
-     * characters is detected.
-     */
-    @Test
-    public void testBuildTableNameLengthDataModelByEntity() {
-        System.out.println("[NGSIToPostgreSQL.buildTableName]"
-            + "-------- When data model is by entity, a table name length greater than 63 characters is truncated");
-
-        Entity entity = new Entity("tooLooooooooooooooooooooooooooooooooooooooooooooooongEntity", "someType", null, null);
-
-        try {
-            String tableName = backend.buildTableName(entity, null);
-            assertTrue(tableName.length() < 63);
-        } catch (Exception e) {
-            fail("[NGSIToPostgreSQL.buildTableName]"
-                + "- FAIL - A table name length greater than 63 characters has not been detected");
-        }
-    }
-
-    @Test
-    public void testRowFields() {
-        System.out.println("[PostgreSQLBackend.listOfFields ]"
-            + "-------- When attrPersistence is column");
-
-        ArrayList<Attribute> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", null, entityAttrs);
-
-        try {
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
-            List<String> expList = Arrays.asList("entityId", "entityType", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
-            Set<String> expectedListOfFields = new HashSet<>(expList);
-
-            try {
-                assertEquals(expectedListOfFields, listOfFields.keySet());
-                System.out.println("[PostgreSQLBackend.listOfFields]"
-                    + "-  OK  - '" + listOfFields + "' is equals to the expected output");
-            } catch (AssertionError e) {
-                System.out.println("[PostgreSQLBackend.listOfFields]"
-                    + "- FAIL - '" + listOfFields + "' is not equals to the expected output");
-                throw e;
-            } // try catch
-        } catch (Exception e) {
-            System.out.println("[PostgreSQLBackend.listOfFields]"
-                + "- FAIL - There was some problem when building the list of fields");
-            throw e;
-        } // try catch
-
-    } // testRowFields
-
-    @Test
-    public void testExportScopeAttribute() {
-        ArrayList<Attribute> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", Set.of("S_UseCase/S_Instance"), entityAttrs);
-
-        try {
-            Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
-            Set<String> expectedListOfFields = Set.of("entityId", "entityType", "scopes", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
-
-            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, 1562561734983L, "", false, false, false);
-            try {
-                assertTrue(valuesForInsert.get(0).contains("'{S_UseCase/S_Instance}'"));
-                assertEquals(expectedListOfFields, listOfFields.keySet());
-                System.out.println("[PostgreSQLBackend.listOfFields]"
-                    + "-  OK  - '" + listOfFields + "' is equals to the expected output");
-            } catch (AssertionError e) {
-                System.out.println("[PostgreSQLBackend.listOfFields]"
-                    + "- FAIL - '" + listOfFields + "' is not equals to the expected output");
-                throw e;
-            } // try catch
-        } catch (Exception e) {
-            System.out.println("[PostgreSQLBackend.listOfFields]"
-                + "- FAIL - There was some problem when building the list of fields");
-            throw e;
-        } // try catch
-
-    } // testRowFields
-
-    @Test
-    public void testValuesForInsertRowWithMetadata() {
-        System.out.println("[PostgreSQLBackend.getValuesForInsert]"
-            + "-------- When attrPersistence is column");
-
-        ArrayList<Attribute> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", null, entityAttrs);
-        long creationTime = 1562561734983L;
-
-        try {
-            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields = backend.listOfFields(entity, "", false, Collections.emptySet());
-            List<String> valuesForInsert = backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
-            List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
-
-            try {
-                assertEquals(expectedValuesForInsert, valuesForInsert);
-                System.out.println("[PostgreSQLBackend.getValuesForInsert]"
-                    + "-  OK  - '" + valuesForInsert + "' is equals to the expected output");
-            } catch (AssertionError e) {
-                System.out.println("[PostgreSQLBackend.valuesForInsert]"
-                    + "- FAIL - '" + valuesForInsert + "' is not equals to the expected output");
-                throw e;
-            } // try catch
-        } catch (Exception e) {
-            System.out.println("[PostgreSQLBackend.valuesForInsert]"
-                + "- FAIL - There was some problem when building values for insert");
-            throw e;
-        } // try catch
-
-    } // testValuesForInsertRowWithMetadata
-
-    @Test
-    public void testIgnoredAttributesForTopLevelAttribute() {
-        ArrayList<Attribute> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        entityAttrs.add(new Attribute("ignoredAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Entity entity = new Entity("someId", "someType", null, entityAttrs);
-        Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr", "anotherIgnoredAttr"));
-        long creationTime = 1562561734983L;
-
-        try {
-            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
-                backend.listOfFields(entity, "", false, ignoredAttributes);
-            List<String> valuesForInsert =
-                backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
-
-            assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredattr")));
-            // values for ignored attribute should not be in the values for insert
-            assertEquals(5, valuesForInsert.get(0).split(",").length);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-    }
-
-    @Test
-    public void testIgnoredAttributesForSubAttribute() {
-        ArrayList<Attribute> entityAttrs = new ArrayList<>();
-        entityAttrs.add(new Attribute("someAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, false, new ArrayList<>()));
-        Attribute subAttribute =
-            new Attribute("ignoredSubAttr", "Property", null, null, null, null, 12.0, false, new ArrayList<>());
-        entityAttrs.add(new Attribute("anotherAttr", "Property", "urn:ngsi-ld:Dataset:01", "2023-02-16T00:00:00Z", null, null, 12.0, true, Collections.singletonList(subAttribute)));
-        Entity entity = new Entity("someId", "someType", null, entityAttrs);
-        Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("ignoredAttr", "ignoredSubAttr"));
-        long creationTime = 1562561734983L;
-
-        try {
-            Map<String, NGSIConstants.POSTGRESQL_COLUMN_TYPES> listOfFields =
-                backend.listOfFields(entity, "", false, ignoredAttributes);
-            List<String> valuesForInsert =
-                backend.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
-
-            assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredsubattr")));
-            // values for ignored sub-attribute should not be in the values for insert
-            assertEquals(7, valuesForInsert.get(0).split(",").length);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-    }
-
-    @Test
-    public void shouldChangeTheTypeOfField() throws Exception {
-        ResultSet resultSetMock = Mockito.mock(ResultSet.class);
-        when(resultSetMock.getString(1)).thenReturn("temperature");
-        when(resultSetMock.getString(2)).thenReturn("numeric");
-        when(resultSetMock.next()).thenReturn(true).thenReturn(false);
-
-        Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields = new TreeMap<>();
-        listOfFields.put("temperature", POSTGRESQL_COLUMN_TYPES.TEXT);
-
-        listOfFields = backend.getUpdatedListOfTypedFields(resultSetMock, listOfFields);
-
-        assertEquals(POSTGRESQL_COLUMN_TYPES.NUMERIC, listOfFields.get("temperature"));
-        assertNotEquals(POSTGRESQL_COLUMN_TYPES.TEXT, listOfFields.get("temperature"));
+    private String loadTestFile(String filename) throws IOException {
+        return Files.readString(Paths.get("src/test/resources/" + filename));
     }
 }

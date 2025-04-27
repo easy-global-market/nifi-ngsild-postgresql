@@ -104,9 +104,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             + "such as an invalid query or an integrity constraint violation")
         .build();
 
-    private static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
-    private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
-    private static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
+    protected static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
+    protected static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
+    protected static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
