@@ -15,6 +15,8 @@ import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.dbcp.DBCPService;
 import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.logging.LogLevel;
+import org.apache.nifi.logging.LogMessage;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -106,7 +108,45 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     private static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
     private static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
 
+    @Override
+    protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
+        final List<PropertyDescriptor> properties = new ArrayList<>();
+        properties.add(CONNECTION_POOL);
+        properties.add(DEFAULT_TENANT);
+        properties.add(DATASETID_PREFIX_TRUNCATE);
+        properties.add(EXPORT_SYSATTRS);
+        properties.add(IGNORE_EMPTY_OBSERVED_AT);
+        properties.add(BATCH_SIZE);
+        properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
+        return properties;
+    }
+
+    @Override
+    public Set<Relationship> getRelationships() {
+        final Set<Relationship> rels = new HashSet<>();
+        rels.add(REL_SUCCESS);
+        rels.add(REL_RETRY);
+        rels.add(REL_FAILURE);
+        return rels;
+    }
+
+    /**
+     * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
+     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
+     */
+    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
+        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
+        if (ignoredAttributesAttribute == null)
+            return Collections.emptySet();
+        else
+            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
+    }
+
     private static final PostgreSQLBackend postgres = new PostgreSQLBackend();
+    private ExceptionHandler<FunctionContext> exceptionHandler;
+    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
+
+    private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> pollFlowFiles(c, s);
 
     private final PartialFunctions.InitConnection<FunctionContext, Connection> initConnection = (c, s, fc, ff) -> {
         final Connection connection = c.getProperty(CONNECTION_POOL).asControllerService(DBCPService.class)
@@ -119,18 +159,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
         return connection;
     };
-    private final GroupingFunction groupFlowFilesBySQL = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
-    };
-    private final PartialFunctions.FetchFlowFiles<FunctionContext> fetchFlowFiles = (c, s, fc, r) -> {
-        final FlowFilePoll poll = pollFlowFiles(c, s);
-        if (poll == null) {
-            return null;
-        }
-        return poll.getFlowFiles();
-    };
-    private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
-    private BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError;
-    private ExceptionHandler<FunctionContext> exceptionHandler;
+
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
             NGSIUtils n = new NGSIUtils();
@@ -189,20 +218,18 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     if (!exceptionHandler.execute(fc, flowFile, input -> {
                         final PreparedStatement stmt = enclosure.getCachedStatement(conn);
                         JdbcCommon.setParameters(stmt, flowFile.getAttributes());
-                        try {
-                            getLogger().debug("Gonna create schema {}", schemaName);
-                            conn.createStatement().execute(postgres.createSchema(schemaName));
-                            getLogger().debug("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
-                            conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
-                            ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
-                            Map<String, POSTGRESQL_COLUMN_TYPES> newColumns = postgres.getNewColumns(rs, updatedListOfTypedFields);
-                            if (!newColumns.isEmpty()) {
-                                getLogger().debug("Identified new columns to create: {}", newColumns);
-                                conn.createStatement().execute(postgres.addColumns(schemaName, tableName, newColumns));
-                            }
-                        } catch (SQLException s) {
-                            getLogger().error("Error when preparing schema: {}", s.toString(), s);
+
+                        getLogger().debug("Gonna create schema {}", schemaName);
+                        conn.createStatement().execute(postgres.createSchema(schemaName));
+                        getLogger().debug("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
+                        conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
+                        ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
+                        Map<String, POSTGRESQL_COLUMN_TYPES> newColumns = postgres.getNewColumns(rs, updatedListOfTypedFields);
+                        if (!newColumns.isEmpty()) {
+                            getLogger().debug("Identified new columns to create: {}", newColumns);
+                            conn.createStatement().execute(postgres.addColumns(schemaName, tableName, newColumns));
                         }
+
                         stmt.addBatch();
                     }, onFlowFileError(context, session, result))) {
                         continue;
@@ -214,67 +241,26 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             }
         }
     };
+
     private final PutGroup.GroupFlowFiles<FunctionContext, Connection, StatementFlowFileEnclosure> groupFlowFiles = (context, session, fc, conn, flowFiles, result) -> {
         final Map<String, StatementFlowFileEnclosure> sqlToEnclosure = new HashMap<>();
         final List<StatementFlowFileEnclosure> groups = new ArrayList<>();
 
-        // There are three patterns:
-        // 1. Support batching: An enclosure has multiple FlowFiles being executed in a batch operation
-        // 2. Obtain keys: An enclosure has multiple FlowFiles, and each FlowFile is executed separately
-        // 3. Fragmented transaction: One FlowFile per Enclosure?
-        if (fc.obtainKeys) {
-            groupFlowFilesBySQL.apply(context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result);
-        } else {
-            groupFlowFilesBySQLBatch.apply(context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result);
-        }
+        groupFlowFilesBySQLBatch.apply(context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result);
 
         return groups;
     };
+
     private final PutGroup.PutFlowFiles<FunctionContext, Connection, StatementFlowFileEnclosure> putFlowFiles = (context, session, fc, conn, enclosure, result) -> {
 
-        if (fc.isSupportBatching()) {
-
-            // We have PreparedStatement that have batches added to them.
-            // We need to execute each batch and close the PreparedStatement.
-            exceptionHandler.execute(fc, enclosure, input -> {
-                try (final PreparedStatement stmt = enclosure.getCachedStatement(conn)) {
-                    stmt.executeBatch();
-                    result.routeTo(enclosure.getFlowFiles(), REL_SUCCESS);
-                }
-            }, onBatchUpdateError(context, session, result));
-
-        } else {
-            for (final FlowFile flowFile : enclosure.getFlowFiles()) {
-
-                final StatementFlowFileEnclosure targetEnclosure
-                    = enclosure instanceof FragmentedEnclosure
-                    ? ((FragmentedEnclosure) enclosure).getTargetEnclosure(flowFile)
-                    : enclosure;
-
-                // Execute update one by one.
-                exceptionHandler.execute(fc, flowFile, input -> {
-                    try (final PreparedStatement stmt = targetEnclosure.getNewStatement(conn, fc.obtainKeys)) {
-
-                        // set the appropriate parameters on the statement.
-                        JdbcCommon.setParameters(stmt, flowFile.getAttributes());
-
-                        stmt.executeUpdate();
-
-                        // attempt to determine the key that was generated, if any. This is not supported by all
-                        // database vendors, so if we cannot determine the generated key (or if the statement is not an INSERT),
-                        // we will just move on without setting the attribute.
-                        FlowFile sentFlowFile = flowFile;
-                        final String generatedKey = determineGeneratedKey(stmt);
-                        if (generatedKey != null) {
-                            sentFlowFile = session.putAttribute(sentFlowFile, "sql.generated.key", generatedKey);
-                        }
-
-                        result.routeTo(sentFlowFile, REL_SUCCESS);
-
-                    }
-                }, onFlowFileError(context, session, result));
+        // We have PreparedStatement that have batches added to them.
+        // We need to execute each batch and close the PreparedStatement.
+        exceptionHandler.execute(fc, enclosure, input -> {
+            try (final PreparedStatement stmt = enclosure.getCachedStatement(conn)) {
+                stmt.executeBatch();
+                result.routeTo(enclosure.getFlowFiles(), REL_SUCCESS);
             }
-        }
+        }, onBatchUpdateError(context, session, result));
 
         if (result.contains(REL_SUCCESS)) {
             // Determine the database URL
@@ -292,50 +278,23 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         }
     };
 
-    @Override
-    protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        final List<PropertyDescriptor> properties = new ArrayList<>();
-        properties.add(CONNECTION_POOL);
-        properties.add(DEFAULT_TENANT);
-        properties.add(DATASETID_PREFIX_TRUNCATE);
-        properties.add(EXPORT_SYSATTRS);
-        properties.add(IGNORE_EMPTY_OBSERVED_AT);
-        properties.add(BATCH_SIZE);
-        properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
-        return properties;
-    }
-
-    @Override
-    public Set<Relationship> getRelationships() {
-        final Set<Relationship> rels = new HashSet<>();
-        rels.add(REL_SUCCESS);
-        rels.add(REL_RETRY);
-        rels.add(REL_FAILURE);
-        return rels;
-    }
-
-    /**
-     * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
-     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
-     */
-    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
-        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
-        if (ignoredAttributesAttribute == null)
-            return Collections.emptySet();
-        else
-            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
-    }
-
-    private ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError(final ProcessContext context, final ProcessSession session, final RoutingResult result) {
+    private ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError(
+        final ProcessContext context,
+        final ProcessSession session,
+        final RoutingResult result
+    ) {
         ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError = createOnError(context, session, result, REL_FAILURE, REL_RETRY);
         onFlowFileError = onFlowFileError.andThen((c, i, r, e) -> {
             switch (r.destination()) {
                 case Failure:
-                    getLogger().error("Failed to update database for {} due to {}; routing to failure", new Object[]{i, e}, e);
+                    logErrorMessage("Failed to update database for {} due to {}; routing to failure", new Object[]{i, e}, e);
                     break;
                 case Retry:
-                    getLogger().error("Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
-                        new Object[]{i, e}, e);
+                    logErrorMessage(
+                        "Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
+                        new Object[]{i, e},
+                        e
+                    );
                     break;
             }
         });
@@ -343,13 +302,16 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     }
 
     private ExceptionHandler.OnError<FunctionContext, StatementFlowFileEnclosure> onBatchUpdateError(
-        final ProcessContext context, final ProcessSession session, final RoutingResult result) {
+        final ProcessContext context,
+        final ProcessSession session,
+        final RoutingResult result
+    ) {
         return RollbackOnFailure.createOnError((c, enclosure, r, e) -> {
 
             // If rollbackOnFailure is enabled, the error will be thrown as ProcessException instead.
             if (e instanceof BatchUpdateException && !c.isRollbackOnFailure()) {
 
-                // If we get a BatchUpdateException, then we want to determine which FlowFile caused the failure,
+                // If we get a BatchUpdateException, then we want to determine which FlowFile caused the failure
                 // and route that FlowFile to failure while routing those that finished processing to success and those
                 // that have not yet been executed to retry.
                 // Currently fragmented transaction does not use batch update.
@@ -357,8 +319,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 final List<FlowFile> batchFlowFiles = enclosure.getFlowFiles();
 
                 // In the presence of a BatchUpdateException, the driver has the option of either stopping when an error
-                // occurs, or continuing. If it continues, then it must account for all statements in the batch and for
-                // those that fail return a Statement.EXECUTE_FAILED for the number of rows updated.
+                // occurs or continuing. If it continues, then it must account for all statements in the batch and for
+                // those that fail to return a Statement.EXECUTE_FAILED for the number of rows updated.
                 // So we will iterate over all the update counts returned. If any is equal to Statement.EXECUTE_FAILED,
                 // we will route the corresponding FlowFile to failure. Otherwise, the FlowFile will go to success
                 // unless it has not yet been processed (its index in the List > updateCounts.length).
@@ -393,8 +355,12 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     }
                 }
 
-                getLogger().error("Failed to update database due to a failed batch update, {}. There were a total of {} FlowFiles that failed, {} that succeeded, "
-                    + "and {} that were not execute and will be routed to retry; ", new Object[]{e, failureCount, successCount, retryCount}, e);
+                logErrorMessage(
+                    "Failed to update database due to a failed batch update, {}. There were a total of {} FlowFiles that failed, {} that succeeded, "
+                        + "and {} that were not execute and will be routed to retry; ",
+                    new Object[]{e, failureCount, successCount, retryCount},
+                    e
+                );
 
                 return;
 
@@ -406,11 +372,18 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             onGroupError = onGroupError.andThen((cl, il, rl, el) -> {
                 switch (r.destination()) {
                     case Failure:
-                        getLogger().error("Failed to update database for {} due to {}; routing to failure", new Object[]{il.getFlowFiles(), e}, e);
+                        logErrorMessage(
+                            "Failed to update database for {} due to {}; routing to failure",
+                            new Object[]{il.getFlowFiles(), e},
+                            e
+                        );
                         break;
                     case Retry:
-                        getLogger().error("Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
-                            new Object[]{il.getFlowFiles(), e}, e);
+                        logErrorMessage(
+                            "Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
+                            new Object[]{il.getFlowFiles(), e},
+                            e
+                        );
                         break;
                     default:
                         break;
@@ -444,9 +417,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             try {
                 conn.rollback();
             } catch (SQLException re) {
-                // Just log the fact that rollback failed.
-                // ProcessSession will be rollback by the thrown Exception so don't have to do anything here.
-                getLogger().warn("Failed to rollback database connection due to %s", new Object[]{re}, re);
+                // Log the fact that rollback failed.
+                // ProcessSession will be rollbacked by the thrown Exception, so don't have to do anything here.
+                getLogger().warn("Failed to rollback database connection due to " + re, re);
             }
         });
 
@@ -471,7 +444,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 return ErrorTypes.UnknownFailure;
             }
         });
-        adjustError = RollbackOnFailure.createAdjustError(getLogger());
+        BiFunction<FunctionContext, ErrorTypes, ErrorTypes.Result> adjustError = RollbackOnFailure.createAdjustError(getLogger());
         exceptionHandler.adjustError(adjustError);
     }
 
@@ -479,7 +452,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     public void onTrigger(ProcessContext context, ProcessSessionFactory sessionFactory) throws ProcessException {
         final Boolean rollbackOnFailure = context.getProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE).asBoolean();
         final FunctionContext functionContext = new FunctionContext(rollbackOnFailure);
-        functionContext.obtainKeys = false;
         RollbackOnFailure.onTrigger(context, sessionFactory, functionContext, getLogger(), session -> process.onTrigger(context, session, functionContext));
     }
 
@@ -491,7 +463,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
      * @param session the process session for pulling flowfiles
      * @return a FlowFilePoll containing a List of FlowFiles to process, or <code>null</code> if there are no FlowFiles to process
      */
-    private FlowFilePoll pollFlowFiles(final ProcessContext context, final ProcessSession session) {
+    private List<FlowFile> pollFlowFiles(final ProcessContext context, final ProcessSession session) {
         final int batchSize = context.getProperty(BATCH_SIZE).asInteger();
         List<FlowFile> flowFiles = session.get(batchSize);
 
@@ -499,29 +471,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             return null;
         }
 
-        return new FlowFilePoll(flowFiles);
-    }
-
-    /**
-     * Returns the key that was generated from the given statement, or <code>null</code> if no key
-     * was generated, or it could not be determined.
-     *
-     * @param stmt the statement that generated a key
-     * @return the key that was generated from the given statement, or <code>null</code> if no key
-     * was generated, or it could not be determined.
-     */
-
-    private String determineGeneratedKey(final PreparedStatement stmt) {
-        try {
-            final ResultSet generatedKeys = stmt.getGeneratedKeys();
-            if (generatedKeys != null && generatedKeys.next()) {
-                return generatedKeys.getString(1);
-            }
-        } catch (final SQLException sqle) {
-            // This is not supported by all vendors. This is a best-effort approach.
-        }
-
-        return null;
+        return flowFiles;
     }
 
     @FunctionalInterface
@@ -535,50 +485,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private static class FunctionContext extends RollbackOnFailure {
         private final long startNanos = System.nanoTime();
-        private boolean obtainKeys = false;
-        private boolean fragmentedTransaction = false;
         private boolean originalAutoCommit = false;
 
         private FunctionContext(boolean rollbackOnFailure) {
             super(rollbackOnFailure, true);
-        }
-
-        private boolean isSupportBatching() {
-            return !obtainKeys && !fragmentedTransaction;
-        }
-    }
-
-    /**
-     * A simple, immutable data structure to hold a List of FlowFiles and an indicator as to whether
-     * or not those FlowFiles represent a "fragmented transaction" - that is, a collection of FlowFiles
-     * that all must be executed as a single transaction (we refer to it as a fragment transaction
-     * because the information for that transaction, including SQL and the parameters, is fragmented
-     * across multiple FlowFiles).
-     */
-
-    private static class FlowFilePoll {
-        private final List<FlowFile> flowFiles;
-
-        public FlowFilePoll(final List<FlowFile> flowFiles) {
-            this.flowFiles = flowFiles;
-        }
-
-        public List<FlowFile> getFlowFiles() {
-            return flowFiles;
-        }
-    }
-
-
-    private static class FragmentedEnclosure extends StatementFlowFileEnclosure {
-
-        private final Map<FlowFile, StatementFlowFileEnclosure> flowFileToEnclosure = new HashMap<>();
-
-        public FragmentedEnclosure() {
-            super(null);
-        }
-
-        public StatementFlowFileEnclosure getTargetEnclosure(final FlowFile flowFile) {
-            return flowFileToEnclosure.get(flowFile);
         }
     }
 
@@ -586,7 +496,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
      * A simple, immutable data structure to hold a Prepared Statement and a List of FlowFiles
      * for which that statement should be evaluated.
      */
-
     private static class StatementFlowFileEnclosure implements FlowFileGroup {
         private final String sql;
         private final List<FlowFile> flowFiles = new ArrayList<>();
@@ -594,28 +503,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         public StatementFlowFileEnclosure(String sql) {
             this.sql = sql;
-        }
-
-        public PreparedStatement getNewStatement(final Connection conn, final boolean obtainKeys) throws SQLException {
-            if (obtainKeys) {
-                // Create a new Prepared Statement, requesting that it return the generated keys.
-                PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-
-                if (stmt == null) {
-                    // since we are passing Statement.RETURN_GENERATED_KEYS, calls to conn.prepareStatement will
-                    // in some cases (at least for DerbyDB) return null.
-                    // We will attempt to recompile the statement without the generated keys being returned.
-                    stmt = conn.prepareStatement(sql);
-                }
-
-                // If we need to obtain keys, then we cannot do a Batch Update. In this case,
-                // we don't need to store the PreparedStatement in the Map because we aren't
-                // doing an addBatch/executeBatch. Instead, we will use the statement once
-                // and close it.
-                return stmt;
-            }
-
-            return conn.prepareStatement(sql);
         }
 
         public PreparedStatement getCachedStatement(final Connection conn) throws SQLException {
@@ -656,5 +543,15 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             final StatementFlowFileEnclosure other = (StatementFlowFileEnclosure) obj;
             return sql.equals(other.sql);
         }
+    }
+
+    private void logErrorMessage(final String message, Object[] objects, final Throwable t) {
+        getLogger().error(
+            new LogMessage.Builder(System.currentTimeMillis(), LogLevel.ERROR)
+                .message(message)
+                .objects(objects)
+                .throwable(t)
+                .createLogMessage()
+        );
     }
 }
