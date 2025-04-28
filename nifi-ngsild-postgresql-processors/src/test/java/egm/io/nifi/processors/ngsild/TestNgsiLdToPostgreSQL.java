@@ -16,11 +16,14 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Testcontainers
 public class TestNgsiLdToPostgreSQL {
-    private PostgreSQLBackend backend;
 
     @Container
     private static final PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>(
@@ -46,18 +49,28 @@ public class TestNgsiLdToPostgreSQL {
         runner.setProperty(connectionPool, DBCPProperties.DB_DRIVERNAME, postgreSQLContainer.getDriverClassName());
         runner.enableControllerService(connectionPool);
         runner.assertValid(connectionPool);
-        backend = new PostgreSQLBackend();
     }
 
     @Test
-    public void itShouldStart() throws IOException {
+    public void itShouldExportCurrentStateOfEntity() throws IOException {
         final Map<String, String> attributes = new HashMap<>();
         attributes.put(NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX, "");
+        runner.setProperty(NgsiLdToPostgreSQL.IGNORE_EMPTY_OBSERVED_AT, "false");
+
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), attributes);
 
         runner.run();
         runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
 
+        try {
+            ResultSet result = postgreSQLContainer.createConnection("")
+                .createStatement()
+                .executeQuery("SELECT count(*) FROM public.shellfishtable");
+            result.next();
+            assertEquals(1, result.getInt(1));
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
         runner.assertAllConditionsMet("success",
             mff -> mff.isAttributeEqual(NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX, "")
         );
