@@ -7,8 +7,6 @@ import egm.io.nifi.processors.ngsild.utils.NGSIUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
-import org.apache.nifi.annotation.behavior.WritesAttribute;
-import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
@@ -37,10 +35,6 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 @Tags({"Postgresql", "sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI-LD", "FIWARE"})
 @CapabilityDescription("Create a database if not exists using the information coming from an NGSI-LD event converted to flow file." +
     "After insert all of the vales of the flow file content extraction the entities and attributes")
-@WritesAttributes({
-    @WritesAttribute(attribute = "sql.generated.key", description = "If the database generated a key for an INSERT statement and the Obtain Generated Keys property is set to true, "
-        + "this attribute will be added to indicate the generated key, if possible. This feature is not supported by all database vendors.")
-})
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
