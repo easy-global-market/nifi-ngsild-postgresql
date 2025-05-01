@@ -1,7 +1,10 @@
 package egm.io.nifi.processors.ngsild;
 
+import egm.io.nifi.processors.ngsild.model.Attribute;
+import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.model.NgsiLdConstants;
+import egm.io.nifi.processors.ngsild.model.PostgreSQLConstants;
 import egm.io.nifi.processors.ngsild.utils.*;
-import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.json.JSONArray;
@@ -19,11 +22,11 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 
-public class PostgreSQLBackend {
+public class PostgreSQLTransformer {
 
-    private static final Logger logger = LoggerFactory.getLogger(PostgreSQLBackend.class);
+    private static final Logger logger = LoggerFactory.getLogger(PostgreSQLTransformer.class);
 
     public Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields(
         Entity entity,
@@ -36,11 +39,11 @@ public class PostgreSQLBackend {
         Map<String, List<Attribute>> attributesByObservedAt =
             entity.getEntityAttrs().stream().collect(Collectors.groupingBy(attrs -> attrs.observedAt));
 
-        aggregation.put(NGSIConstants.RECV_TIME, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
-        aggregation.put(NGSIConstants.ENTITY_ID, POSTGRESQL_COLUMN_TYPES.TEXT);
-        aggregation.put(NGSIConstants.ENTITY_TYPE, POSTGRESQL_COLUMN_TYPES.TEXT);
+        aggregation.put(PostgreSQLConstants.RECV_TIME, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
+        aggregation.put(PostgreSQLConstants.ENTITY_ID, POSTGRESQL_COLUMN_TYPES.TEXT);
+        aggregation.put(PostgreSQLConstants.ENTITY_TYPE, POSTGRESQL_COLUMN_TYPES.TEXT);
         if (entity.getScopes() != null) {
-            aggregation.put(NGSIConstants.ENTITY_SCOPES, POSTGRESQL_COLUMN_TYPES.ARRAY);
+            aggregation.put(PostgreSQLConstants.ENTITY_SCOPES, POSTGRESQL_COLUMN_TYPES.ARRAY);
         }
 
         List<Attribute> attributes = new ArrayList<>();
@@ -81,13 +84,13 @@ public class PostgreSQLBackend {
             logger.debug("Added {} in the list of fields for entity {}", attrName, entity.entityId);
 
             if (!attribute.observedAt.isEmpty()) {
-                String encodedObservedAt = encodeTimePropertyToColumnName(attrName, NGSIConstants.OBSERVED_AT);
+                String encodedObservedAt = encodeTimePropertyToColumnName(attrName, NgsiLdConstants.OBSERVED_AT);
                 aggregation.put(encodedObservedAt, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
             } else if (exportSysAttrs) {
-                String encodedModifiedAt = encodeTimePropertyToColumnName(attrName, NGSIConstants.MODIFIED_AT);
+                String encodedModifiedAt = encodeTimePropertyToColumnName(attrName, NgsiLdConstants.MODIFIED_AT);
                 aggregation.put(encodedModifiedAt, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
 
-                String encodedCreatedAt = encodeTimePropertyToColumnName(attrName, NGSIConstants.CREATED_AT);
+                String encodedCreatedAt = encodeTimePropertyToColumnName(attrName, NgsiLdConstants.CREATED_AT);
                 aggregation.put(encodedCreatedAt, POSTGRESQL_COLUMN_TYPES.TIMESTAMPTZ);
             }
 
@@ -114,22 +117,22 @@ public class PostgreSQLBackend {
         // For too long dataset ids, truncate to 32 (not perfect, nor totally bulletproof)
         String datasetIdEncodedValue =
             (!datasetId.isEmpty() ?
-                "_" + NGSIEncoders.encodePostgreSQL(NGSIEncoders.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)) :
+                "_" + PostgreSQLUtils.encodePostgreSQL(PostgreSQLUtils.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)) :
                 ""
             );
-        String encodedName = NGSIEncoders.encodePostgreSQL(attributeName) + datasetIdEncodedValue;
-        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
+        String encodedName = PostgreSQLUtils.encodePostgreSQL(attributeName) + datasetIdEncodedValue;
+        return PostgreSQLUtils.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     private String encodeTimePropertyToColumnName(String encodedAttributeName, String timeProperty) {
-        String encodedName = encodedAttributeName + "_" + NGSIEncoders.encodePostgreSQL(timeProperty);
-        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
+        String encodedName = encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(timeProperty);
+        return PostgreSQLUtils.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     private String encodeSubAttributeToColumnName(String attributeName, String datasetId, String subAttributeName, String datasetIdPrefixToTruncate) {
         String encodedAttributeName = encodeAttributeToColumnName(attributeName, datasetId, datasetIdPrefixToTruncate);
-        String encodedName = encodedAttributeName + "_" + NGSIEncoders.encodePostgreSQL(subAttributeName);
-        return NGSIEncoders.truncateToMaxPgSize(encodedName).toLowerCase();
+        String encodedName = encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(subAttributeName);
+        return PostgreSQLUtils.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
     public List<String> getValuesForInsert(
@@ -242,11 +245,11 @@ public class PostgreSQLBackend {
 
         ZonedDateTime creationDate = Instant.ofEpochMilli(creationTime).atZone(ZoneOffset.UTC);
 
-        valuesForColumns.put(NGSIConstants.RECV_TIME, "'" + DateTimeFormatter.ISO_INSTANT.format(creationDate) + "'");
-        valuesForColumns.put(NGSIConstants.ENTITY_ID, "'" + entity.getEntityId() + "'");
-        valuesForColumns.put(NGSIConstants.ENTITY_TYPE, "'" + entity.getEntityType() + "'");
+        valuesForColumns.put(PostgreSQLConstants.RECV_TIME, "'" + DateTimeFormatter.ISO_INSTANT.format(creationDate) + "'");
+        valuesForColumns.put(PostgreSQLConstants.ENTITY_ID, "'" + entity.getEntityId() + "'");
+        valuesForColumns.put(PostgreSQLConstants.ENTITY_TYPE, "'" + entity.getEntityType() + "'");
         if (entity.getScopes() != null)
-            valuesForColumns.put(NGSIConstants.ENTITY_SCOPES, "'{" + String.join(",", entity.getScopes()) + "}'");
+            valuesForColumns.put(PostgreSQLConstants.ENTITY_SCOPES, "'{" + String.join(",", entity.getScopes()) + "}'");
 
         if ("GeoProperty".equals(attribute.getAttrType())) {
             JSONObject geoProppertyObject = (JSONObject) attribute.getAttrValue();
@@ -264,7 +267,7 @@ public class PostgreSQLBackend {
             // to be correctly rendered, viz tools often require a properties object into the GeoJSON object
             // so add one containing the entity id (only thing common to all entities)
             JSONObject geoJsonProperties = new JSONObject();
-            geoJsonProperties.put(NGSIConstants.ENTITY_ID, entity.entityId);
+            geoJsonProperties.put(PostgreSQLConstants.ENTITY_ID, entity.entityId);
             geoJson.put("properties", geoJsonProperties);
             geoJson.put("geometry", geoJsonObject);
 
@@ -279,10 +282,10 @@ public class PostgreSQLBackend {
         }
 
         if (!attribute.getObservedAt().isEmpty()) {
-            String encodedObservedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.OBSERVED_AT);
+            String encodedObservedAt = encodeTimePropertyToColumnName(encodedAttributeName, NgsiLdConstants.OBSERVED_AT);
             valuesForColumns.put(encodedObservedAt, formatFieldForValueInsert(attribute.getObservedAt(), listOfFields.get(encodedObservedAt)));
         } else if (exportSysAttrs) {
-            String encodedCreatedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.CREATED_AT);
+            String encodedCreatedAt = encodeTimePropertyToColumnName(encodedAttributeName, NgsiLdConstants.CREATED_AT);
             if (attribute.createdAt == null ||
                 attribute.createdAt.isEmpty() ||
                 ZonedDateTime.parse(attribute.createdAt).toEpochSecond() > ZonedDateTime.parse(oldestTimeStamp).toEpochSecond()
@@ -291,7 +294,7 @@ public class PostgreSQLBackend {
             } else
                 valuesForColumns.put(encodedCreatedAt, formatFieldForValueInsert(attribute.createdAt, listOfFields.get(encodedCreatedAt)));
 
-            String encodedModifiedAt = encodeTimePropertyToColumnName(encodedAttributeName, NGSIConstants.MODIFIED_AT);
+            String encodedModifiedAt = encodeTimePropertyToColumnName(encodedAttributeName, NgsiLdConstants.MODIFIED_AT);
             if (attribute.modifiedAt != null && !attribute.modifiedAt.isEmpty()) {
                 valuesForColumns.put(encodedModifiedAt, formatFieldForValueInsert(attribute.modifiedAt, listOfFields.get(encodedModifiedAt)));
             }
@@ -353,10 +356,10 @@ public class PostgreSQLBackend {
     }
 
     public String buildSchemaName(String tenantName) throws Exception {
-        String schemaName = NGSICharsets.encodePostgreSQL(tenantName.toLowerCase());
-        if (schemaName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building schema name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, schemaName);
-            throw new Exception("Building schema name '" + schemaName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
+        String schemaName = PostgreSQLUtils.encodePostgreSQL(tenantName);
+        if (schemaName.length() > PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN) {
+            logger.error("Building schema name '{}' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN, schemaName);
+            throw new Exception("Building schema name '" + schemaName + "' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN);
         }
         return schemaName;
     }
@@ -371,15 +374,15 @@ public class PostgreSQLBackend {
 
     public String buildTableName(Entity entity, String tableNameSuffix) throws Exception {
         String tableName;
-        String entityType = entity.getEntityType().toLowerCase();
+        String entityType = entity.getEntityType();
 
         if (tableNameSuffix != null && !tableNameSuffix.isEmpty())
-            tableName = NGSICharsets.encodePostgreSQL(entityType) + NGSIConstants.OLD_CONCATENATOR + tableNameSuffix;
-        else tableName = NGSICharsets.encodePostgreSQL(entityType);
+            tableName = PostgreSQLUtils.encodePostgreSQL(entityType) + PostgreSQLConstants.OLD_CONCATENATOR + tableNameSuffix;
+        else tableName = PostgreSQLUtils.encodePostgreSQL(entityType);
 
-        if (tableName.length() > NGSIConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building table name '{}' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN, tableName);
-            throw new Exception("Building table name '" + tableName + "' and its length is greater than " + NGSIConstants.POSTGRESQL_MAX_NAME_LEN);
+        if (tableName.length() > PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN) {
+            logger.error("Building table name '{}' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN, tableName);
+            throw new Exception("Building table name '" + tableName + "' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN);
         }
         return tableName;
     }
@@ -507,5 +510,23 @@ public class PostgreSQLBackend {
             return false;
         }
         return true;
+    }
+
+    public enum POSTGRESQL_COLUMN_TYPES {
+        TEXT,
+        TIMESTAMPTZ,
+        TIMETZ,
+        DATE,
+        NUMERIC,
+        GEOMETRY,
+        JSONB,
+        ARRAY;
+
+        public String getPostgresType() {
+            if (this == POSTGRESQL_COLUMN_TYPES.ARRAY) {
+                return "text[]";
+            }
+            return this.name();
+        }
     }
 }

@@ -1,5 +1,8 @@
 package egm.io.nifi.processors.ngsild.utils;
 
+import egm.io.nifi.processors.ngsild.model.Attribute;
+import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.model.Event;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.stream.io.StreamUtils;
@@ -12,17 +15,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 
-public class NGSIUtils {
+public class NgsiLdUtils {
 
-    private static final Logger logger = LoggerFactory.getLogger(NGSIUtils.class);
+    private static final Logger logger = LoggerFactory.getLogger(NgsiLdUtils.class);
 
     public static List<String> IGNORED_KEYS_ON_ATTRIBUTES =
         List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
 
-    public NGSIEvent getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
+    public static Event getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
 
         final byte[] buffer = new byte[(int) flowFile.getSize()];
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
@@ -35,10 +38,10 @@ public class NGSIUtils {
         JSONArray content = new JSONArray(flowFileContent);
         List<Entity> entities = parseNgsiLdEntities(content, flattenObservations);
 
-        return new NGSIEvent(creationTime, ngsiLdTenant, entities);
+        return new Event(creationTime, ngsiLdTenant, entities);
     }
 
-    public List<Entity> parseNgsiLdEntities(JSONArray content, boolean flattenObservations) {
+    public static List<Entity> parseNgsiLdEntities(JSONArray content, boolean flattenObservations) {
         List<Entity> entities = new ArrayList<>();
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
@@ -76,7 +79,7 @@ public class NGSIUtils {
         return entities;
     }
 
-    private Set<String> parseEntityScopes(JSONObject temporalEntity) {
+    protected static Set<String> parseEntityScopes(JSONObject temporalEntity) {
         if (!temporalEntity.has("scope")) {
             return null;
         } else if (temporalEntity.get("scope") instanceof JSONArray) {
@@ -89,7 +92,7 @@ public class NGSIUtils {
         }
     }
 
-    private String parseEntityTypes(JSONObject temporalEntity) {
+    protected static String parseEntityTypes(JSONObject temporalEntity) {
         if (temporalEntity.get("type") instanceof JSONArray) {
             return temporalEntity.getJSONArray("type")
                 .toList()
@@ -101,7 +104,7 @@ public class NGSIUtils {
         }
     }
 
-    private Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
+    private static Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
         // When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification -
         // if it has no history in the specified time range.
         // In this case, some flow file can give entity that contains attributes with only null values so attribute type can be set to null
@@ -194,7 +197,7 @@ public class NGSIUtils {
         }
     }
 
-    private Attribute parseNgsiLdSubAttribute(String key, JSONObject value) {
+    private static Attribute parseNgsiLdSubAttribute(String key, JSONObject value) {
         String subAttrType = value.get("type").toString();
         Object subAttrValue = "";
         if ("Relationship".contentEquals(subAttrType)) {
@@ -215,7 +218,7 @@ public class NGSIUtils {
     // In this case, these attributes are null or can have a null value.
     // Moreover, when doing a temporal request, if some attributes have no temporal values, they are still added, and they are null
     // So we filter out attributes that contain a null value or whose whole value is null
-    private void addAttributeIfValid(List<Attribute> attributes, Attribute attribute) {
+    private static void addAttributeIfValid(List<Attribute> attributes, Attribute attribute) {
         if (attribute != null &&
             attribute.getAttrValue() != null &&
             !Objects.equals(attribute.getAttrValue().toString(), "null"))

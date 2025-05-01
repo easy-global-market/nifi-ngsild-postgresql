@@ -1,9 +1,9 @@
 package egm.io.nifi.processors.ngsild;
 
-import egm.io.nifi.processors.ngsild.utils.Entity;
-import egm.io.nifi.processors.ngsild.utils.NGSIConstants.POSTGRESQL_COLUMN_TYPES;
-import egm.io.nifi.processors.ngsild.utils.NGSIEvent;
-import egm.io.nifi.processors.ngsild.utils.NGSIUtils;
+import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES;
+import egm.io.nifi.processors.ngsild.model.Event;
+import egm.io.nifi.processors.ngsild.utils.NgsiLdUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
@@ -136,7 +136,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
     }
 
-    private static final PostgreSQLBackend postgres = new PostgreSQLBackend();
+    private static final PostgreSQLTransformer postgres = new PostgreSQLTransformer();
     private ExceptionHandler<FunctionContext> exceptionHandler;
     private PutGroup<FunctionContext, Connection, StatementFlowFileEnclosure> process;
 
@@ -156,10 +156,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
-            NGSIUtils n = new NGSIUtils();
             final boolean flattenObservations = flowFile.getAttribute(FLATTEN_OBSERVATIONS) != null &&
                 Objects.equals(flowFile.getAttribute(FLATTEN_OBSERVATIONS), "true");
-            final NGSIEvent event = n.getEventFromFlowFile(flowFile, flattenObservations, session);
+            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, flattenObservations, session);
             final long creationTime = event.getCreationTime();
             final String ngsiLdTenant =
                 (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
