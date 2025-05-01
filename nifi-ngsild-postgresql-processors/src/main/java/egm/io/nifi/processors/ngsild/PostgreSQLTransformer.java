@@ -7,6 +7,7 @@ import egm.io.nifi.processors.ngsild.model.PostgreSQLConstants;
 import egm.io.nifi.processors.ngsild.utils.*;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.nifi.processor.exception.ProcessException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN;
 
 public class PostgreSQLTransformer {
 
@@ -357,9 +359,10 @@ public class PostgreSQLTransformer {
 
     public String buildSchemaName(String tenantName) throws Exception {
         String schemaName = PostgreSQLUtils.encodePostgreSQL(tenantName);
-        if (schemaName.length() > PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building schema name '{}' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN, schemaName);
-            throw new Exception("Building schema name '" + schemaName + "' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN);
+        if (schemaName.length() > POSTGRESQL_MAX_NAME_LEN) {
+            String errorMessage = "Building schema name '" + schemaName + "' and its length is greater than " + POSTGRESQL_MAX_NAME_LEN;
+            logger.error(errorMessage);
+            throw new Exception(errorMessage);
         }
         return schemaName;
     }
@@ -380,9 +383,10 @@ public class PostgreSQLTransformer {
             tableName = PostgreSQLUtils.encodePostgreSQL(entityType) + PostgreSQLConstants.OLD_CONCATENATOR + tableNameSuffix;
         else tableName = PostgreSQLUtils.encodePostgreSQL(entityType);
 
-        if (tableName.length() > PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN) {
-            logger.error("Building table name '{}' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN, tableName);
-            throw new Exception("Building table name '" + tableName + "' and its length is greater than " + PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN);
+        if (tableName.length() > POSTGRESQL_MAX_NAME_LEN) {
+            String errorMessage = "Building table name '" + tableName + "' and its length is greater than " + POSTGRESQL_MAX_NAME_LEN;
+            logger.error(errorMessage);
+            throw new Exception(errorMessage);
         }
         return tableName;
     }
@@ -416,52 +420,45 @@ public class PostgreSQLTransformer {
         return "select column_name, udt_name from information_schema.columns where table_name ='" + tableName + "';";
     }
 
-    public Map<String, POSTGRESQL_COLUMN_TYPES> getUpdatedListOfTypedFields(ResultSet rs, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields) {
+    public Map<String, POSTGRESQL_COLUMN_TYPES> getUpdatedListOfTypedFields(ResultSet rs, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields) throws SQLException {
         // create an initial map containing all the fields with columns names in lowercase
-        try {
-            // Get the column names; column indices start from 1
-            while (rs.next()) {
-                POSTGRESQL_COLUMN_TYPES postgresqlColumnTypes;
-                if (rs.getString(2).equals("_text"))
-                    postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.ARRAY;
-                else
-                    postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase());
-                Pair<String, POSTGRESQL_COLUMN_TYPES> columnNameWithDataType =
-                    new ImmutablePair<>(rs.getString(1), postgresqlColumnTypes);
-                if (listOfFields.containsKey(columnNameWithDataType.getKey()) &&
-                    listOfFields.get(columnNameWithDataType.getKey()) != columnNameWithDataType.getValue()) {
-                    logger.info("Column {} with type {} already existed with a different type {}",
-                        columnNameWithDataType.getKey(),
-                        listOfFields.get(columnNameWithDataType.getKey()),
-                        columnNameWithDataType.getValue()
-                    );
-                    // update the column type to avoid type inconsistencies when inserting new values
-                    // if a value in an entity does not match the current type in DB, a NULL value will be used
-                    listOfFields.replace(columnNameWithDataType.getKey(), columnNameWithDataType.getValue());
-                }
+        // Get the column names; column indices start from 1
+        while (rs.next()) {
+            POSTGRESQL_COLUMN_TYPES postgresqlColumnTypes;
+            if (rs.getString(2).equals("_text"))
+                postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.ARRAY;
+            else
+                postgresqlColumnTypes = POSTGRESQL_COLUMN_TYPES.valueOf(rs.getString(2).toUpperCase());
+            Pair<String, POSTGRESQL_COLUMN_TYPES> columnNameWithDataType =
+                new ImmutablePair<>(rs.getString(1), postgresqlColumnTypes);
+            if (listOfFields.containsKey(columnNameWithDataType.getKey()) &&
+                listOfFields.get(columnNameWithDataType.getKey()) != columnNameWithDataType.getValue()) {
+                logger.info("Column {} with type {} already existed with a different type {}",
+                    columnNameWithDataType.getKey(),
+                    listOfFields.get(columnNameWithDataType.getKey()),
+                    columnNameWithDataType.getValue()
+                );
+                // update the column type to avoid type inconsistencies when inserting new values
+                // if a value in an entity does not match the current type in DB, a NULL value will be used
+                listOfFields.replace(columnNameWithDataType.getKey(), columnNameWithDataType.getValue());
             }
-        } catch (SQLException s) {
-            logger.error("Error while inspecting columns: {}", s.getMessage(), s);
         }
+
         return listOfFields;
     }
 
-    public Map<String, POSTGRESQL_COLUMN_TYPES> getNewColumns(ResultSet rs, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields) {
+    public Map<String, POSTGRESQL_COLUMN_TYPES> getNewColumns(ResultSet rs, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields) throws SQLException {
         // create an initial map containing all the fields with columns names in lowercase
         Map<String, POSTGRESQL_COLUMN_TYPES> newFields = new HashMap<>(listOfFields).entrySet().stream().map(e -> Map.entry(e.getKey().toLowerCase(), e.getValue())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        try {
-            // Get the column names; column indices start from 1
-            while (rs.next()) {
-                String columnName = rs.getString(1);
-                logger.debug("Looking at column {} (exists: {})", columnName, newFields.containsKey(columnName));
-                newFields.remove(columnName);
-            }
-
-            logger.debug("New columns to create: {}", newFields.keySet());
-        } catch (SQLException s) {
-            logger.error("Error while inspecting columns: {}", s.getMessage(), s);
+        // Get the column names; column indices start from 1
+        while (rs.next()) {
+            String columnName = rs.getString(1);
+            logger.debug("Looking at column {} (exists: {})", columnName, newFields.containsKey(columnName));
+            newFields.remove(columnName);
         }
+
+        logger.debug("New columns to create: {}", newFields.keySet());
 
         return newFields;
     }

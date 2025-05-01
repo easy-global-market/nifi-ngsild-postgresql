@@ -1,12 +1,14 @@
 package egm.io.nifi.processors.ngsild;
 
-import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES;
+import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.Event;
 import egm.io.nifi.processors.ngsild.utils.NgsiLdUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
+import org.apache.nifi.annotation.behavior.WritesAttribute;
+import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
@@ -28,6 +30,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import static java.lang.String.valueOf;
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnError;
 
 @SupportsBatching
@@ -35,6 +40,20 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 @Tags({"Postgresql", "sql", "put", "rdbms", "database", "create", "insert", "relational", "NGSI-LD", "FIWARE"})
 @CapabilityDescription("Create a database if not exists using the information coming from an NGSI-LD event converted to flow file." +
     "After insert all of the vales of the flow file content extraction the entities and attributes")
+@WritesAttributes({
+    @WritesAttribute(
+        attribute = "error.message",
+        description = "If processing of the flow file fails, this attribute will contain the error message"
+    ),
+    @WritesAttribute(
+        attribute = "error.code",
+        description = "If processing of the flow file fails, this attribute will contain the error code (if greater than 0)"
+    ),
+    @WritesAttribute(
+        attribute = "error.sql.state",
+        description = "If processing of the flow file fails, this attribute will contain the SQL state (if not null)"
+    )
+})
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
@@ -97,6 +116,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .description("A FlowFile is routed to this relationship if the database cannot be updated and retrying the operation will also fail, "
             + "such as an invalid query or an integrity constraint violation")
         .build();
+
+    protected static final String ERROR_MESSAGE_ATTR = "error.message";
+    protected static final String ERROR_CODE_ATTR = "error.code";
+    protected static final String ERROR_SQL_STATE_ATTR = "error.sql.state";
 
     protected static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
     protected static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
@@ -231,6 +254,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 }
             } catch (Exception e) {
                 getLogger().error("Unexpected exception processing flow file: {}", e.toString(), e);
+                addErrorAttributesToFlowFile(session, flowFile, e);
+                result.routeTo(flowFile, REL_FAILURE);
             }
         }
     };
@@ -277,21 +302,43 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         final RoutingResult result
     ) {
         ExceptionHandler.OnError<FunctionContext, FlowFile> onFlowFileError = createOnError(context, session, result, REL_FAILURE, REL_RETRY);
-        onFlowFileError = onFlowFileError.andThen((c, i, r, e) -> {
+        onFlowFileError = onFlowFileError.andThen((c, ff, r, e) -> {
             switch (r.destination()) {
                 case Failure:
-                    logErrorMessage("Failed to update database for {} due to {}; routing to failure", new Object[]{i, e}, e);
+                    logErrorMessage("Failed to update database for {} due to {}; routing to failure", new Object[]{ff, e}, e);
+                    addErrorAttributesToFlowFile(session, ff, e);
                     break;
                 case Retry:
                     logErrorMessage(
                         "Failed to update database for {} due to {}; it is possible that retrying the operation will succeed, so routing to retry",
-                        new Object[]{i, e},
+                        new Object[]{ff, e},
                         e
                     );
+                    addErrorAttributesToFlowFile(session, ff, e);
                     break;
             }
         });
         return RollbackOnFailure.createOnError(onFlowFileError);
+    }
+
+    private ExceptionHandler.OnError<RollbackOnFailure, FlowFileGroup> onGroupError(final ProcessContext context, final ProcessSession session, final RoutingResult result) {
+        ExceptionHandler.OnError<RollbackOnFailure, FlowFileGroup> onGroupError =
+            ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY);
+
+        onGroupError = onGroupError.andThen((ctx, flowFileGroup, errorTypesResult, exception) -> {
+            switch (errorTypesResult.destination()) {
+                case Failure:
+                    List<FlowFile> flowFilesToFailure = getFlowFilesOnRelationship(result, REL_FAILURE);
+                    result.getRoutedFlowFiles().put(REL_FAILURE, addErrorAttributesToFlowFilesInGroup(session, flowFilesToFailure, flowFileGroup.getFlowFiles(), exception));
+                    break;
+                case Retry:
+                    List<FlowFile> flowFilesToRetry = getFlowFilesOnRelationship(result, REL_RETRY);
+                    result.getRoutedFlowFiles().put(REL_RETRY, addErrorAttributesToFlowFilesInGroup(session, flowFilesToRetry, flowFileGroup.getFlowFiles(), exception));
+                    break;
+            }
+        });
+
+        return onGroupError;
     }
 
     private ExceptionHandler.OnError<FunctionContext, StatementFlowFileEnclosure> onBatchUpdateError(
@@ -324,7 +371,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     final int updateCount = updateCounts[i];
                     final FlowFile flowFile = batchFlowFiles.get(i);
                     if (updateCount == Statement.EXECUTE_FAILED) {
-                        result.routeTo(flowFile, REL_FAILURE);
+                        result.routeTo(addErrorAttributesToFlowFile(session, flowFile, e), REL_FAILURE);
                         failureCount++;
                     } else {
                         result.routeTo(flowFile, REL_SUCCESS);
@@ -336,7 +383,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     // if no failures found, the driver decided not to execute the statements after the
                     // failure, so route the last one to failure.
                     final FlowFile failedFlowFile = batchFlowFiles.get(updateCounts.length);
-                    result.routeTo(failedFlowFile, REL_FAILURE);
+                    result.routeTo(addErrorAttributesToFlowFile(session, failedFlowFile, e), REL_FAILURE);
                     failureCount++;
                 }
 
@@ -360,8 +407,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             }
 
             // Apply default error handling and logging for other Exceptions.
-            ExceptionHandler.OnError<RollbackOnFailure, FlowFileGroup> onGroupError
-                = ExceptionHandler.createOnGroupError(context, session, result, REL_FAILURE, REL_RETRY);
+            ExceptionHandler.OnError<RollbackOnFailure, FlowFileGroup> onGroupError = onGroupError(context, session, result);
             onGroupError = onGroupError.andThen((cl, il, rl, el) -> {
                 switch (r.destination()) {
                     case Failure:
@@ -384,6 +430,37 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             });
             onGroupError.apply(c, enclosure, r, e);
         });
+    }
+
+    private List<FlowFile> getFlowFilesOnRelationship(RoutingResult result, final Relationship relationship) {
+        return Optional.ofNullable(result.getRoutedFlowFiles().get(relationship))
+            .orElse(emptyList());
+    }
+
+    private List<FlowFile> addErrorAttributesToFlowFilesInGroup(ProcessSession session, List<FlowFile> flowFilesOnRelationship, List<FlowFile> flowFilesInGroup, Exception exception) {
+        return flowFilesOnRelationship.stream()
+            .map(ff -> flowFilesInGroup.contains(ff) ? addErrorAttributesToFlowFile(session, ff, exception) : ff)
+            .collect(toList());
+    }
+
+    private FlowFile addErrorAttributesToFlowFile(final ProcessSession session, FlowFile flowFile, final Exception exception) {
+        final Map<String, String> attributes = new HashMap<>();
+        attributes.put(ERROR_MESSAGE_ATTR, exception.getMessage());
+
+        if (exception instanceof SQLException) {
+            int errorCode = ((SQLException) exception).getErrorCode();
+            String sqlState = ((SQLException) exception).getSQLState();
+
+            if (errorCode > 0) {
+                attributes.put(ERROR_CODE_ATTR, valueOf(errorCode));
+            }
+
+            if (sqlState != null) {
+                attributes.put(ERROR_SQL_STATE_ATTR, sqlState);
+            }
+        }
+
+        return session.putAllAttributes(flowFile, attributes);
     }
 
     @OnScheduled
@@ -429,10 +506,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
         exceptionHandler = new ExceptionHandler<>();
         exceptionHandler.mapException(e -> {
-            if (e instanceof SQLNonTransientException) {
-                return ErrorTypes.InvalidInput;
-            } else if (e instanceof SQLException) {
+            if (e instanceof SQLTransientException) {
                 return ErrorTypes.TemporalFailure;
+            } else if (e instanceof SQLException) {
+                return ErrorTypes.InvalidInput;
             } else {
                 return ErrorTypes.UnknownFailure;
             }
