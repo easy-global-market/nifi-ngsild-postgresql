@@ -4,12 +4,10 @@ import java.util.List;
 
 public class Event {
     public long creationTime;
-    public String ngsiLdTenant;
     public List<Entity> entities;
 
-    public Event(long creationTime, String ngsiLdTenant, List<Entity> entities) {
+    public Event(long creationTime, List<Entity> entities) {
         this.creationTime = creationTime;
-        this.ngsiLdTenant = ngsiLdTenant;
         this.entities = entities;
     }
 
@@ -19,9 +17,5 @@ public class Event {
 
     public long getCreationTime() {
         return creationTime;
-    }
-
-    public String getNgsiLdTenant() {
-        return ngsiLdTenant;
     }
 }

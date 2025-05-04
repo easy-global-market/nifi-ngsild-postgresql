@@ -47,7 +47,7 @@ public class NgsiLdToPostgreSQLTests {
         runner.setProperty(NgsiLdToPostgreSQL.CONNECTION_POOL, "dbcp");
         runner.setProperty(NgsiLdToPostgreSQL.BATCH_SIZE, "100");
         runner.setProperty(RollbackOnFailure.ROLLBACK_ON_FAILURE, "false");
-        runner.setProperty(NgsiLdToPostgreSQL.DEFAULT_TENANT, "public");
+        runner.setProperty(DB_SCHEMA, "public");
 
         DBCPConnectionPool connectionPool = new DBCPConnectionPool();
         runner.addControllerService("dbcp", connectionPool);
@@ -62,7 +62,7 @@ public class NgsiLdToPostgreSQLTests {
     @Test
     public void itShouldExportCurrentStateOfEntity() throws IOException, SQLException {
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), getDefaultAttributes());
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
         runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
@@ -80,11 +80,10 @@ public class NgsiLdToPostgreSQLTests {
 
     @Test
     public void itShouldExportCurrentStateOfBatchOfEntities() throws IOException, SQLException {
-        final Map<String, String> attributes = getDefaultAttributes();
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), attributes);
-        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), attributes);
-        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), attributes);
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
 
@@ -104,7 +103,7 @@ public class NgsiLdToPostgreSQLTests {
     @Test
     public void itShouldRouteToFailureAndAddErrorAttributeIfSchemNameIsTooLong() throws IOException {
         runner.setProperty(
-            DEFAULT_TENANT,
+            DB_SCHEMA,
             "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongSchema"
         );
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
@@ -122,8 +121,8 @@ public class NgsiLdToPostgreSQLTests {
 
     @Test
     public void itShouldRouteToFailureAndAddErrorAttributeIfInvalidSchemName() throws IOException {
-        runner.setProperty(DEFAULT_TENANT, "default");
-        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), getDefaultAttributes());
+        runner.setProperty(DB_SCHEMA, "default");
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
 
@@ -137,13 +136,8 @@ public class NgsiLdToPostgreSQLTests {
 
     @Test
     public void itShouldRouteToFailureAndAddErrorAttributeIfTableNameIsTooLong() throws IOException {
-        runner.enqueue(
-            loadTestFile("entity-current.jsonld").getBytes(),
-            Collections.singletonMap(
-                TABLE_NAME_SUFFIX,
-                "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongSuffix"
-            )
-        );
+        runner.setProperty(TABLE_NAME_SUFFIX, "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongSuffix");
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes());
 
         runner.run();
 
@@ -158,16 +152,17 @@ public class NgsiLdToPostgreSQLTests {
 
     @Test
     public void itShouldRouteToFailureAndSuccessIfTableNameIsTooLongForOneFlowFile() throws IOException {
+        runner.setProperty(TABLE_NAME_SUFFIX, "${tableNameSuffix}");
         runner.enqueue(
             loadTestFile("entity-current.jsonld").getBytes(),
             Collections.singletonMap(
-                TABLE_NAME_SUFFIX,
-                "tooLoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongSuffix"
+                "tableNameSuffix",
+                "tooloooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongsuffix"
             )
         );
         runner.enqueue(
             loadTestFile("entity-current.jsonld").getBytes(),
-            Collections.singletonMap(TABLE_NAME_SUFFIX, "")
+            Collections.singletonMap("tableNameSuffix", "")
         );
 
         runner.run();
@@ -192,9 +187,5 @@ public class NgsiLdToPostgreSQLTests {
                 stmt.executeUpdate("drop table " + schemaName + "." + tableName);
             }
         }
-    }
-
-    private Map<String, String> getDefaultAttributes() {
-        return Collections.singletonMap(TABLE_NAME_SUFFIX, "");
     }
 }

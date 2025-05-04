@@ -31,14 +31,10 @@ public class NgsiLdUtils {
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
         final String flowFileContent = new String(buffer, StandardCharsets.UTF_8);
 
-        Map<String, String> flowFileAttributes = flowFile.getAttributes();
-        String ngsiLdTenant = flowFileAttributes.get("NGSILD-Tenant") == null ? "" : flowFileAttributes.get("NGSILD-Tenant");
-        long creationTime = flowFile.getEntryDate();
-
         JSONArray content = new JSONArray(flowFileContent);
         List<Entity> entities = parseNgsiLdEntities(content, flattenObservations);
 
-        return new Event(creationTime, ngsiLdTenant, entities);
+        return new Event(flowFile.getEntryDate(), entities);
     }
 
     public static List<Entity> parseNgsiLdEntities(JSONArray content, boolean flattenObservations) {

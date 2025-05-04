@@ -380,7 +380,9 @@ public class PostgreSQLTransformer {
         String entityType = entity.getEntityType();
 
         if (tableNameSuffix != null && !tableNameSuffix.isEmpty())
-            tableName = PostgreSQLUtils.encodePostgreSQL(entityType) + PostgreSQLConstants.OLD_CONCATENATOR + tableNameSuffix;
+            tableName = PostgreSQLUtils.encodePostgreSQL(entityType) +
+                PostgreSQLConstants.OLD_CONCATENATOR +
+                PostgreSQLUtils.encodePostgreSQL(tableNameSuffix);
         else tableName = PostgreSQLUtils.encodePostgreSQL(entityType);
 
         if (tableName.length() > POSTGRESQL_MAX_NAME_LEN) {

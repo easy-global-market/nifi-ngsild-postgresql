@@ -14,6 +14,7 @@ import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.dbcp.DBCPService;
+import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.LogLevel;
 import org.apache.nifi.logging.LogMessage;
@@ -57,19 +58,49 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
-        .name("JDBC Connection Pool")
+        .name("connection-pool")
+        .displayName("JDBC Connection Pool")
         .description("Specifies the JDBC Connection Pool to use in order to convert the JSON message to a SQL statement. "
             + "The Connection Pool is necessary in order to determine the appropriate database column types.")
         .identifiesControllerService(DBCPService.class)
         .required(true)
         .build();
-    protected static final PropertyDescriptor DEFAULT_TENANT = new PropertyDescriptor.Builder()
-        .name("default-tenant")
-        .displayName("Default NGSI-LD Tenant")
-        .description("Default NGSI-LD Tenant for building the database name")
+    protected static final PropertyDescriptor DB_SCHEMA = new PropertyDescriptor.Builder()
+        .name("db-schema")
+        .displayName("DB schema")
+        .description("DB schema used to create tables")
         .required(false)
-        .defaultValue("")
+        .defaultValue("public")
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+        .build();
+    protected static final PropertyDescriptor TABLE_NAME_SUFFIX = new PropertyDescriptor.Builder()
+        .name("table-name-suffix")
+        .displayName("Table name suffix")
+        .description("Suffix to add to the name of the created table")
+        .required(false)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+        .build();
+    protected static final PropertyDescriptor FLATTEN_OBSERVATIONS = new PropertyDescriptor.Builder()
+        .name("flatten-observations")
+        .displayName("Flatten observations")
+        .description("true or false, true for exporting observed attributes in a group of generic columns.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("false")
+        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+        .build();
+    protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
+        .name("ignore-empty-observed-at")
+        .displayName("Ignore empty observed at lines")
+        .description("true or false, true for ignoring rows without any observation date.")
+        .required(false)
+        .allowableValues("true", "false")
+        .defaultValue("true")
+        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
     protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
         .name("datasetid-prefix-truncate")
@@ -86,21 +117,23 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .required(false)
         .allowableValues("true", "false")
         .defaultValue("false")
+        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
         .build();
-    protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
-        .name("ignore-empty-observed-at")
-        .displayName("Ignore empty observed at lines")
-        .description("true or false, true for ignoring rows without any observation date.")
+    protected static final PropertyDescriptor IGNORED_ATTRIBUTES = new PropertyDescriptor.Builder()
+        .name("ignored-attributes")
+        .displayName("Attributes to ignore")
+        .description("Attributes to ignore when exporting the entities. Comma-separated list of attribute names.")
         .required(false)
-        .allowableValues("true", "false")
-        .defaultValue("true")
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
     protected static final PropertyDescriptor BATCH_SIZE = new PropertyDescriptor.Builder()
-        .name("Batch Size")
+        .name("batch-size")
+        .displayName("Batch Size")
         .description("The preferred number of FlowFiles to put to the database in a single transaction")
         .required(true)
-        .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
         .defaultValue("10")
+        .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
         .build();
 
     protected static final Relationship REL_SUCCESS = new Relationship.Builder()
@@ -121,18 +154,17 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     protected static final String ERROR_CODE_ATTR = "error.code";
     protected static final String ERROR_SQL_STATE_ATTR = "error.sql.state";
 
-    protected static final String TABLE_NAME_SUFFIX = "Export-TableNameSuffix";
-    protected static final String IGNORED_ATTRIBUTES = "Export-IgnoredAttributes";
-    protected static final String FLATTEN_OBSERVATIONS = "Export-FlattenObservations";
-
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         final List<PropertyDescriptor> properties = new ArrayList<>();
         properties.add(CONNECTION_POOL);
-        properties.add(DEFAULT_TENANT);
+        properties.add(DB_SCHEMA);
+        properties.add(TABLE_NAME_SUFFIX);
+        properties.add(FLATTEN_OBSERVATIONS);
+        properties.add(IGNORE_EMPTY_OBSERVED_AT);
         properties.add(DATASETID_PREFIX_TRUNCATE);
         properties.add(EXPORT_SYSATTRS);
-        properties.add(IGNORE_EMPTY_OBSERVED_AT);
+        properties.add(IGNORED_ATTRIBUTES);
         properties.add(BATCH_SIZE);
         properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
         return properties;
@@ -149,14 +181,14 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     /**
      * Extract a list of NGSI-LD Attributes to ignore when processing the given flow file. The list of attributes
-     * is conveyed via the {@value IGNORED_ATTRIBUTES} flow file attribute as a comma-separated list of strings.
+     * is configured via the "ignored-attributes" processor property.
      */
-    private Set<String> getIgnoredAttributes(final FlowFile flowFile) {
-        final String ignoredAttributesAttribute = flowFile.getAttribute(IGNORED_ATTRIBUTES);
-        if (ignoredAttributesAttribute == null)
+    private Set<String> getIgnoredAttributes(final ProcessContext context, final FlowFile flowFile) {
+        final String ignoredAttributes = context.getProperty(IGNORED_ATTRIBUTES).evaluateAttributeExpressions(flowFile).getValue();
+        if (ignoredAttributes == null)
             return Collections.emptySet();
         else
-            return Arrays.stream(flowFile.getAttribute(IGNORED_ATTRIBUTES).split(",")).collect(Collectors.toSet());
+            return Arrays.stream(ignoredAttributes.split(",")).collect(Collectors.toSet());
     }
 
     private static final PostgreSQLTransformer postgres = new PostgreSQLTransformer();
@@ -179,29 +211,27 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
-            final boolean flattenObservations = flowFile.getAttribute(FLATTEN_OBSERVATIONS) != null &&
-                Objects.equals(flowFile.getAttribute(FLATTEN_OBSERVATIONS), "true");
+            final String dbSchema = context.getProperty(DB_SCHEMA).evaluateAttributeExpressions(flowFile).getValue();
+            final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
+            final boolean flattenObservations = context.getProperty(FLATTEN_OBSERVATIONS).evaluateAttributeExpressions(flowFile).asBoolean();
+            final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
             final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, flattenObservations, session);
             final long creationTime = event.getCreationTime();
-            final String ngsiLdTenant =
-                (event.getNgsiLdTenant().compareToIgnoreCase("") == 0) ?
-                    context.getProperty(DEFAULT_TENANT).getValue() : event.getNgsiLdTenant();
             try {
-                final String schemaName = postgres.buildSchemaName(ngsiLdTenant);
+                final String schemaName = postgres.buildSchemaName(dbSchema);
 
                 List<Entity> entities = event.getEntities();
                 for (Entity entity : entities) {
                     getLogger().info("Exporting entity " + entity.entityId);
 
-                    String tableName =
-                        postgres.buildTableName(entity, flowFile.getAttribute(TABLE_NAME_SUFFIX).toLowerCase());
+                    String tableName = postgres.buildTableName(entity, tableNameSuffix);
 
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
                         postgres.listOfFields(
                             entity,
                             context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
                             context.getProperty(EXPORT_SYSATTRS).asBoolean(),
-                            getIgnoredAttributes(flowFile)
+                            getIgnoredAttributes(context, flowFile)
                         );
 
                     ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypes(tableName));
@@ -219,7 +249,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                             updatedListOfTypedFields,
                             context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
                             context.getProperty(EXPORT_SYSATTRS).asBoolean(),
-                            context.getProperty(IGNORE_EMPTY_OBSERVED_AT).asBoolean(),
+                            ignoreEmptyObservedAt,
                             flattenObservations
                         );
                     getLogger().debug("Prepared insert query: {}", sql);
