@@ -57,6 +57,8 @@ import static org.apache.nifi.processor.util.pattern.ExceptionHandler.createOnEr
 })
 public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
+    protected static final String DEFAULT_DB_SCHEMA = "stellio";
+
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
         .name("connection-pool")
         .displayName("JDBC Connection Pool")
@@ -70,7 +72,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .displayName("DB schema")
         .description("DB schema used to create tables")
         .required(false)
-        .defaultValue("public")
+        .defaultValue(DEFAULT_DB_SCHEMA)
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
@@ -209,7 +211,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private final GroupingFunction groupFlowFilesBySQLBatch = (context, session, fc, conn, flowFiles, groups, sqlToEnclosure, result) -> {
         for (final FlowFile flowFile : flowFiles) {
-            final String dbSchema = context.getProperty(DB_SCHEMA).evaluateAttributeExpressions(flowFile).getValue();
+            String dbSchema = context.getProperty(DB_SCHEMA).evaluateAttributeExpressions(flowFile).getValue();
+            if (dbSchema == null || dbSchema.isEmpty())
+                dbSchema = DEFAULT_DB_SCHEMA;
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
             final boolean flattenObservations = context.getProperty(FLATTEN_OBSERVATIONS).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
