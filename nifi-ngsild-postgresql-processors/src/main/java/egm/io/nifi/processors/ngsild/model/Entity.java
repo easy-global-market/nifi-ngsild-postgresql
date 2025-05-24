@@ -1,4 +1,4 @@
-package egm.io.nifi.processors.ngsild.utils;
+package egm.io.nifi.processors.ngsild.model;
 
 import java.util.List;
 import java.util.Set;

@@ -1,4 +1,4 @@
-package egm.io.nifi.processors.ngsild.utils;
+package egm.io.nifi.processors.ngsild.model;
 
 import java.util.List;
 
@@ -12,6 +12,7 @@ public class Attribute {
     public String modifiedAt;
     public boolean hasSubAttrs;
     public List<Attribute> subAttrs;
+
     public Attribute(
         String attrName,
         String attrType,

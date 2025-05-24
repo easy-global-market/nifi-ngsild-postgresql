@@ -1,5 +1,7 @@
 package egm.io.nifi.processors.ngsild.utils;
 
+import egm.io.nifi.processors.ngsild.model.Attribute;
+import egm.io.nifi.processors.ngsild.model.Entity;
 import org.json.JSONArray;
 import org.junit.jupiter.api.Test;
 
@@ -11,12 +13,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static egm.io.nifi.processors.ngsild.utils.NGSIConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class TestNGSIUtils {
-
-    private final NGSIUtils ngsiUtils = new NGSIUtils();
+public class NgsiLdUtilsTests {
 
     private String loadTestFile(String filename) throws IOException {
         return Files.readString(Paths.get("src/test/resources/" + filename));
@@ -25,7 +25,7 @@ public class TestNGSIUtils {
     @Test
     public void testTemporalEntities() throws IOException {
         String data = loadTestFile("temporalEntities.json");
-        List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), false);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), false);
         assertEquals(2, entities.size());
 
         List<Attribute> attributes = entities.get(0).entityAttrs;
@@ -36,7 +36,7 @@ public class TestNGSIUtils {
     @Test
     public void verifyIfAttributesAreCompliant() throws IOException {
         String data = loadTestFile("temporalEntities.json");
-        List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), false);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), false);
         assertTrue(entities.stream().allMatch(
             entity -> entity.entityAttrs.stream()
                 .allMatch(attributes ->
@@ -49,7 +49,7 @@ public class TestNGSIUtils {
     @Test
     public void testEntityWithFlattenObservations() throws IOException {
         String data = loadTestFile("entity-temporal.jsonld");
-        List<Entity> entities = ngsiUtils.parseNgsiLdEntities(new JSONArray(data), true);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), true);
         assertEquals(1, entities.size());
         Entity entity = entities.get(0);
         List<Attribute> attributes = entity.entityAttrs;
