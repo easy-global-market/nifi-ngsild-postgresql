@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class NgsiLdUtilsTests {
+public class TestNgsiLdUtils {
 
     private String loadTestFile(String filename) throws IOException {
         return Files.readString(Paths.get("src/test/resources/" + filename));
