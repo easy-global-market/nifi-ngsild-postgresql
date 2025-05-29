@@ -203,7 +203,7 @@ public class NgsiLdUtils {
         } else if ("GeoProperty".contentEquals(subAttrType)) {
             subAttrValue = value.get("value").toString();
         } else if ("JsonProperty".contentEquals(subAttrType)) {
-            subAttrValue = value.get("value").toString();
+            subAttrValue = value.get("json").toString();
         }
 
         return new Attribute(key.toLowerCase(), subAttrType, "", "", "", "", subAttrValue, false, null);
