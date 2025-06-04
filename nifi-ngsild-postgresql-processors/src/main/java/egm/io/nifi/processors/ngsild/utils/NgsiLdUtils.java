@@ -135,7 +135,7 @@ public class NgsiLdUtils {
             if (("Property".equals(attrType) && "unitCode".equals(keyOne))) {
                 if (value.get(keyOne) instanceof String)
                     subAttributes.add(new Attribute(keyOne.toLowerCase(), "Property", "", "", "", "", value.getString(keyOne), false, null));
-            } else if ("RelationshipDetails".contains(keyOne)) {
+            } else if ("entity".contains(keyOne)) {
                 JSONObject relation = value.getJSONObject(keyOne);
                 relation.remove("id");
                 relation.remove("type");
