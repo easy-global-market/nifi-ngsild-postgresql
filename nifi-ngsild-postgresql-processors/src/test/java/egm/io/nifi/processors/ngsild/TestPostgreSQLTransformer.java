@@ -20,7 +20,7 @@ import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASUR
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-public class PostgreSQLTransformerTests {
+public class TestPostgreSQLTransformer {
 
     private final PostgreSQLTransformer pgTransformer = new PostgreSQLTransformer();
 
