@@ -4,12 +4,12 @@ pipeline {
         jdk 'JDK 21'
     }
     stages {
-        stage('Pre Build') {
+        stage('Notify build in Slack') {
             steps {
                 slackSend (color: '#D4DADF', message: "Started ${env.BUILD_URL}")
             }
         }
-        stage('Build and test') {
+        stage('Build, test and package') {
             steps {
                 sh './mvnw -B package --file pom.xml'
             }
@@ -23,9 +23,9 @@ pipeline {
         success {
             script {
                 if (env.BRANCH_NAME == 'main')
-                    build job: 'NiFi.Prod.Builder'
+                    build job: '/NiFi.Prod.Builder'
                 else if (env.BRANCH_NAME == 'develop')
-                    build job: 'NiFi.Dev.Builder'
+                    build job: '/NiFi.Dev.Builder'
             }
             slackSend (color: '#36b37e', message: "Success: ${env.BUILD_URL} after ${currentBuild.durationString.replace(' and counting', '')}")
         }
