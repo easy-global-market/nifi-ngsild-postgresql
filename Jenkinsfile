@@ -17,7 +17,7 @@ pipeline {
     }
     post {
         always {
-            junit 'nifi-ngsild-postgresql-processors/target/surefire-reports'
+            junit 'nifi-ngsild-postgresql-processors/target/surefire-reports/*.xml'
             archiveArtifacts artifacts: 'nifi-ngsild-postgresql-nar/target/nifi-ngsild-postgresql-nar-*.nar', onlyIfSuccessful: true
         }
         success {
