@@ -19,11 +19,11 @@
     <parent>
         <groupId>egm.io</groupId>
         <artifactId>nifi-ngsild-postgresql</artifactId>
-        <version>2.4.0</version>
+        <version>latest-dev</version>
     </parent>
 
     <artifactId>nifi-ngsild-postgresql-nar</artifactId>
-    <version>2.4.0</version>
+    <version>latest-dev</version>
     <packaging>nar</packaging>
     <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
@@ -41,7 +41,7 @@
         <dependency>
             <groupId>egm.io</groupId>
             <artifactId>nifi-ngsild-postgresql-processors</artifactId>
-            <version>2.4.0</version>
+            <version>latest-dev</version>
         </dependency>
     </dependencies>
 

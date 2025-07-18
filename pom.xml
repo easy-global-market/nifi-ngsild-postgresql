@@ -24,7 +24,7 @@
 
     <groupId>egm.io</groupId>
     <artifactId>nifi-ngsild-postgresql</artifactId>
-    <version>2.4.0</version>
+    <version>latest-dev</version>
     <packaging>pom</packaging>
 
     <properties>
