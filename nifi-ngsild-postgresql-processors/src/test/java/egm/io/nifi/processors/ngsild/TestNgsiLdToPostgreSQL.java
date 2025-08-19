@@ -17,10 +17,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.*;
@@ -59,45 +56,562 @@ public class TestNgsiLdToPostgreSQL {
         runner.assertValid(connectionPool);
     }
 
+    public void compareColumns(Connection connection, List<String> expectedColumns,  String schema, String tableName) throws SQLException {
+        Set<String> expectedColumnsSet = new HashSet<>(expectedColumns);
+
+        DatabaseMetaData metaData = connection.getMetaData();
+        ResultSet columns = metaData.getColumns(null, schema, tableName, null);
+
+        Set<String> actualColumnsSet = new HashSet<>();
+        while (columns.next()) {
+            String columnName = columns.getString("COLUMN_NAME");
+            actualColumnsSet.add(columnName);
+        }
+        columns.close();
+
+        assertEquals(expectedColumnsSet, actualColumnsSet, "The columns in the table do not match the expected columns.");
+    }
+
+    public void compareRowCount(Connection connection, int expectedRowCount, String schema, String tableName) throws SQLException {
+        String query = String.format("SELECT COUNT(*) FROM %s.%s", schema, tableName);
+        try (Statement statement = connection.createStatement()) {
+            ResultSet resultSet = statement.executeQuery(query);
+
+            resultSet.next();
+            int actualRowCount = resultSet.getInt(1);
+
+            assertEquals(expectedRowCount, actualRowCount, "The number of rows in the table do not match the expected number of rows.");
+        }
+    }
+
     @Test
-    public void itShouldExportCurrentStateOfEntity() throws IOException, SQLException {
+    public void currentStateDefaultExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
         runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
 
-        try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            try (final Statement statement = connection.createStatement() ) {
-                ResultSet result = statement.executeQuery("SELECT count(*) FROM public.shellfishtable");
-                assertTrue(result.next());
-                assertEquals(1, result.getInt(1));
-            }
-        }
+        int expectedRowCount = 1;
+        List<String> expectedColumns = Arrays.asList(
+                "addresslocality",
+                "containedin",
+                "concessionnumber",
+                "entityid",
+                "entitytype",
+                "expirydate",
+                "familyofuse",
+                "location",
+                "location_geometry",
+                "location_geojson",
+                "managementstructure",
+                "natureofuselabel",
+                "parcel",
+                "rank",
+                "structure",
+                "surface",
+                "surface_unitcode",
+                "recvtime"
+        );
 
-        dropTable("public", "shellfishtable");
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
+            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+        }
+        finally {
+            dropTable("public", "shellfishtable");
+        }
     }
 
     @Test
-    public void itShouldExportCurrentStateOfBatchOfEntities() throws IOException, SQLException {
+    public void currentStateDefaultExportBatch() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
-
         runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 3);
 
-        try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            try (final Statement statement = connection.createStatement() ) {
-                ResultSet result = statement.executeQuery("SELECT count(*) FROM public.shellfishtable");
-                assertTrue(result.next());
-                assertEquals(3, result.getInt(1));
-            }
-        }
+        int expectedRowCount = 3;
+        List<String> expectedColumns = Arrays.asList(
+                "addresslocality",
+                "containedin",
+                "concessionnumber",
+                "entityid",
+                "entitytype",
+                "expirydate",
+                "familyofuse",
+                "location",
+                "location_geometry",
+                "location_geojson",
+                "managementstructure",
+                "natureofuselabel",
+                "parcel",
+                "rank",
+                "structure",
+                "surface",
+                "surface_unitcode",
+                "recvtime"
+        );
 
-        dropTable("public", "shellfishtable");
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
+            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+        }
+        finally {
+            dropTable("public", "shellfishtable");
+        }
+    }
+
+    @Test
+    public void currentStateDefaultExportSchemaAndTableNameSuffix() throws IOException , SQLException{
+        runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.setProperty(DB_SCHEMA, "private");
+        runner.setProperty(TABLE_NAME_SUFFIX, "suffix");
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 1;
+        List<String> expectedColumns = Arrays.asList(
+                "addresslocality",
+                "containedin",
+                "concessionnumber",
+                "entityid",
+                "entitytype",
+                "expirydate",
+                "familyofuse",
+                "location",
+                "location_geometry",
+                "location_geojson",
+                "managementstructure",
+                "natureofuselabel",
+                "parcel",
+                "rank",
+                "structure",
+                "surface",
+                "surface_unitcode",
+                "recvtime"
+        );
+
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "private", "shellfishtable_suffix");
+            compareColumns(connection, expectedColumns, "private", "shellfishtable_suffix");
+        }
+        finally {
+            dropTable("private", "shellfishtable_suffix");
+        }
+    }
+
+    @Test
+    public void currentStateFlattenExport() throws IOException , SQLException{
+        runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(FLATTEN_OBSERVATIONS, "true");
+        runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 0;
+        List<String> expectedColumns = Arrays.asList(
+                "addresslocality",
+                "containedin",
+                "concessionnumber",
+                "entityid",
+                "entitytype",
+                "expirydate",
+                "familyofuse",
+                "location",
+                "location_geometry",
+                "location_geojson",
+                "managementstructure",
+                "natureofuselabel",
+                "parcel",
+                "rank",
+                "structure",
+                "surface",
+                "surface_unitcode",
+                "recvtime"
+        );
+
+
+
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
+            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+        }
+        finally {
+            dropTable("public", "shellfishtable");
+        }
+    }
+
+    @Test
+    public void notificationDefaultExport() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "entityid",
+                "entitytype",
+                "faecalcoliform_k63_0to1meter",
+                "faecalcoliform_k63_0to1meter_citation",
+                "faecalcoliform_k63_0to1meter_depthsampling",
+                "faecalcoliform_k63_0to1meter_ispartofprogram",
+                "faecalcoliform_k63_0to1meter_observedat",
+                "faecalcoliform_k63_0to1meter_qualitydescription",
+                "faecalcoliform_k63_0to1meter_qualitylevel",
+                "faecalcoliform_k63_0to1meter_sampledescription",
+                "faecalcoliform_k63_0to1meter_unitcode",
+                "faecalcoliform_k63_halfbottom",
+                "faecalcoliform_k63_halfbottom_citation",
+                "faecalcoliform_k63_halfbottom_depthsampling",
+                "faecalcoliform_k63_halfbottom_ispartofprogram",
+                "faecalcoliform_k63_halfbottom_observedat",
+                "faecalcoliform_k63_halfbottom_qualitydescription",
+                "faecalcoliform_k63_halfbottom_qualitylevel",
+                "faecalcoliform_k63_halfbottom_sampledescription",
+                "faecalcoliform_k63_halfbottom_unitcode",
+                "recvtime",
+                "sextantcode",
+                "servesdataset",
+                "servesdataset_catalog",
+                "servesdataset_description",
+                "servesdataset_group",
+                "servesdataset_includedparameters",
+                "servesdataset_ispublishedby",
+                "servesdataset_landingpage",
+                "servesdataset_specificaccesspolicy",
+                "servesdataset_subtheme",
+                "servesdataset_title",
+                "stationcode",
+                "specificaccesspolicy",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void notificationDefaultExportIgnoredAttributesAndDatasetTruncate() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.setProperty(IGNORED_ATTRIBUTES, "servesdataset,unitcode,citation");
+        runner.setProperty(DATASETID_PREFIX_TRUNCATE, "urn:ngsi-ld:");
+        runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "entityid",
+                "entitytype",
+                "faecalcoliform_dataset_k63_0to1meter",
+                "faecalcoliform_dataset_k63_0to1meter_depthsampling",
+                "faecalcoliform_dataset_k63_0to1meter_ispartofprogram",
+                "faecalcoliform_dataset_k63_0to1meter_observedat",
+                "faecalcoliform_dataset_k63_0to1meter_qualitydescription",
+                "faecalcoliform_dataset_k63_0to1meter_qualitylevel",
+                "faecalcoliform_dataset_k63_0to1meter_sampledescription",
+                "faecalcoliform_dataset_k63_0to1meter_qualitylevel",
+                "faecalcoliform_dataset_k63_halfbottom",
+                "faecalcoliform_dataset_k63_halfbottom_depthsampling",
+                "faecalcoliform_dataset_k63_halfbottom_ispartofprogram",
+                "faecalcoliform_dataset_k63_halfbottom_observedat",
+                "faecalcoliform_dataset_k63_halfbottom_qualitydescription",
+                "faecalcoliform_dataset_k63_halfbottom_qualitylevel",
+                "faecalcoliform_dataset_k63_halfbottom_sampledescription",
+                "recvtime",
+                "sextantcode",
+                "specificaccesspolicy",
+                "stationcode",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void notificationFlattenExport() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "true");
+        runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "entityid",
+                "entitytype",
+                "measure",
+                "measure_citation",
+                "measure_datasetid",
+                "measure_depthsampling",
+                "measure_ispartofprogram",
+                "measure_observedat",
+                "measure_parametername",
+                "measure_qualitydescription",
+                "measure_qualitylevel",
+                "measure_sampledescription",
+                "measure_unitcode",
+                "recvtime",
+                "sextantcode",
+                "servesdataset",
+                "servesdataset_catalog",
+                "servesdataset_description",
+                "servesdataset_group",
+                "servesdataset_includedparameters",
+                "servesdataset_landingpage",
+                "servesdataset_specificaccesspolicy",
+                "servesdataset_subtheme",
+                "servesdataset_title",
+                "servesdataset_ispublishedby",
+                "servesdataset_title",
+                "stationcode",
+                "specificaccesspolicy",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void temporalDefaultExport() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "accessurl",
+                "entityid",
+                "entitytype",
+                "faecalcoliform",
+                "faecalcoliform_observedat",
+                "faecalcoliform_unitcode",
+                "faecalenterococcus",
+                "faecalenterococcus_observedat",
+                "faecalenterococcus_unitcode",
+                "lastmodifiedat",
+                "location",
+                "location_geojson",
+                "location_geometry",
+                "location_lat",
+                "location_lon",
+                "recvtime",
+                "servesdataset",
+                "servesdataset_catalog",
+                "servesdataset_description",
+                "servesdataset_includedparameters",
+                "servesdataset_landingpage",
+                "servesdataset_theme",
+                "servesdataset_title",
+                "specificaccesspolicy",
+                "stationcode",
+                "status",
+                "temporalresolution",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void temporalDefaultExportExportSysAttrs() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.setProperty(EXPORT_SYSATTRS, "true");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "accessurl",
+                "accessurl_createdat",
+                "accessurl_modifiedat",
+                "entityid",
+                "entitytype",
+                "faecalcoliform",
+                "faecalcoliform_observedat",
+                "faecalcoliform_unitcode",
+                "faecalenterococcus",
+                "faecalenterococcus_observedat",
+                "faecalenterococcus_unitcode",
+                "lastmodifiedat",
+                "lastmodifiedat_createdat",
+                "lastmodifiedat_modifiedat",
+                "location",
+                "location_createdat",
+                "location_geojson",
+                "location_geometry",
+                "location_lat",
+                "location_lon",
+                "location_modifiedat",
+                "recvtime",
+                "servesdataset",
+                "servesdataset_catalog",
+                "servesdataset_createdat",
+                "servesdataset_description",
+                "servesdataset_includedparameters",
+                "servesdataset_landingpage",
+                "servesdataset_modifiedat",
+                "servesdataset_theme",
+                "servesdataset_title",
+                "stationcode",
+                "stationcode_createdat",
+                "stationcode_modifiedat",
+                "specificaccesspolicy",
+                "specificaccesspolicy_createdat",
+                "specificaccesspolicy_modifiedat",
+                "status",
+                "status_createdat",
+                "status_modifiedat",
+                "temporalresolution",
+                "temporalresolution_createdat",
+                "temporalresolution_modifiedat",
+                "title",
+                "title_createdat",
+                "title_modifiedat"
+        );
+
+
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void temporalDefaultExportIgnoredAttributes() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "false");
+        runner.setProperty(IGNORED_ATTRIBUTES, "servesdataset,unitcode");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 2;
+        List<String> expectedColumns = Arrays.asList(
+                "accessurl",
+                "entityid",
+                "entitytype",
+                "faecalcoliform",
+                "faecalcoliform_observedat",
+                "faecalenterococcus",
+                "faecalenterococcus_observedat",
+                "lastmodifiedat",
+                "location",
+                "location_geojson",
+                "location_geometry",
+                "location_lat",
+                "location_lon",
+                "recvtime",
+                "specificaccesspolicy",
+                "stationcode",
+                "status",
+                "temporalresolution",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+
+    @Test
+    public void temporalFlattenExport() throws IOException , SQLException{
+        runner.setProperty(FLATTEN_OBSERVATIONS, "true");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        int expectedRowCount = 4;
+        List<String> expectedColumns = Arrays.asList(
+                "accessurl",
+                "entityid",
+                "entitytype",
+                "lastmodifiedat",
+                "location",
+                "location_geojson",
+                "location_geometry",
+                "location_lat",
+                "location_lon",
+                "measure",
+                "measure_datasetid",
+                "measure_observedat",
+                "measure_parametername",
+                "measure_unitcode",
+                "recvtime",
+                "servesdataset",
+                "servesdataset_catalog",
+                "servesdataset_description",
+                "servesdataset_includedparameters",
+                "servesdataset_landingpage",
+                "servesdataset_theme",
+                "servesdataset_title",
+                "specificaccesspolicy",
+                "stationcode",
+                "status",
+                "temporalresolution",
+                "title"
+        );
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            compareRowCount(connection, expectedRowCount, "public", "distribution");
+            compareColumns(connection, expectedColumns, "public", "distribution");
+        }
+        finally {
+            dropTable("public", "distribution");
+        }
     }
 
     @Test
