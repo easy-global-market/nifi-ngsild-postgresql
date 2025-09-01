@@ -5,7 +5,7 @@
     "hasRel": {
       "type": "Relationship",
       "object": "urn:ngsi-ld:RelationTest:Test03",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:RelationTest:Test03",
         "type": "RelationTest",
         "country": [
@@ -23,7 +23,7 @@
     "hasRelation": {
       "type": "Relationship",
       "object": "urn:ngsi-ld:RelationTest:Test02",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:RelationTest:Test02",
         "type": "RelationTest",
         "country": {
@@ -89,7 +89,7 @@
     "hasRel": {
       "type": "Relationship",
       "object": "urn:ngsi-ld:RelationTest:Test04",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:RelationTest:Test04",
         "type": "RelationTest",
         "country": [
@@ -107,7 +107,7 @@
     "hasRelation": {
       "type": "Relationship",
       "object": "urn:ngsi-ld:RelationTest:Test01",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:RelationTest:Test01",
         "type": "RelationTest",
         "country": {

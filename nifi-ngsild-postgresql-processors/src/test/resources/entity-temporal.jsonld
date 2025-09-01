@@ -13,7 +13,7 @@
     "servesDataset": {
       "type": "Relationship",
       "object": "urn:ngsi-ld:Dataset:MicrobiologieDREAL",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:Dataset:MicrobiologieDREAL",
         "type": "Dataset",
         "description": {
