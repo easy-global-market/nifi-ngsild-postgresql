@@ -128,10 +128,9 @@ public class PostgreSQLTransformer {
     }
 
     private String encodeTimePropertyToColumnName(String encodedAttributeName, String timeProperty) {
-        String encodedName = (!Objects.equals(encodedAttributeName, GENERIC_MEASURE) && Objects.equals(timeProperty, OBSERVED_AT)
+        String encodedName = Objects.equals(timeProperty, OBSERVED_AT) && !Objects.equals(encodedAttributeName, GENERIC_MEASURE)
                 ? PostgreSQLUtils.encodePostgreSQL(timeProperty)
-                : encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(timeProperty)
-        );
+                : encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(timeProperty);
         return PostgreSQLUtils.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
