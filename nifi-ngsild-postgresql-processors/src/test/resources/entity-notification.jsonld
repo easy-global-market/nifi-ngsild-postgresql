@@ -11,7 +11,7 @@
       "type": "Relationship",
       "createdAt": "2023-04-19T17:59:50.467619709Z",
       "object": "urn:ngsi-ld:Dataset:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
-      "RelationshipDetails": {
+      "entity": {
         "id": "urn:ngsi-ld:Dataset:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
         "type": "Dataset",
         "description": {
