@@ -199,7 +199,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     private final PartialFunctions.InitConnection<FunctionContext, Connection> initConnection = (c, s, fc, ff) -> {
         final Connection connection = c.getProperty(CONNECTION_POOL).asControllerService(DBCPService.class)
-            .getConnection(ff == null ? Collections.emptyMap() : ff.get(0).getAttributes());
+            .getConnection(ff == null ? Collections.emptyMap() : ff.getFirst().getAttributes());
         try {
             fc.originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -638,11 +638,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             if (obj == this) {
                 return false;
             }
-            if (!(obj instanceof StatementFlowFileEnclosure)) {
+            if (!(obj instanceof StatementFlowFileEnclosure other)) {
                 return false;
             }
 
-            final StatementFlowFileEnclosure other = (StatementFlowFileEnclosure) obj;
             return sql.equals(other.sql);
         }
     }

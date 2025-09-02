@@ -7,7 +7,6 @@ import egm.io.nifi.processors.ngsild.model.PostgreSQLConstants;
 import egm.io.nifi.processors.ngsild.utils.*;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.nifi.processor.exception.ProcessException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -157,12 +156,12 @@ public class PostgreSQLTransformer {
         List<String> observedTimestamps =
             attributesByObservedAt.keySet().stream()
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
         // get all the attributes without an observedAt timestamp to inject them as is in each row
         List<Attribute> attributesWithoutObservedAt =
             entity.getEntityAttrs().stream()
                 .filter(attribute -> attribute.observedAt == null || attribute.observedAt.isEmpty())
-                .collect(Collectors.toList());
+                .toList();
 
         String oldestTimeStamp;
         if (observedTimestamps.get(0).isEmpty()) {
@@ -202,8 +201,8 @@ public class PostgreSQLTransformer {
                 List<Attribute> commonAttributes =
                     attributes.stream()
                         .filter(attribute -> !Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                        .collect(Collectors.toList());
-                // first fill with the common attributes (the non observed ones)
+                        .toList();
+                // first fill with the common attributes (the non-observed ones)
                 for (Attribute commonAttribute : commonAttributes) {
                     Map<String, String> attributesValues =
                         insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
@@ -213,7 +212,7 @@ public class PostgreSQLTransformer {
                 List<Attribute> observedAttributes =
                     attributes.stream()
                         .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                        .collect(Collectors.toList());
+                        .toList();
                 // then for each observed attribute, add a new row
                 for (Attribute observedAttribute : observedAttributes) {
                     Map<String, String> attributesValues =
