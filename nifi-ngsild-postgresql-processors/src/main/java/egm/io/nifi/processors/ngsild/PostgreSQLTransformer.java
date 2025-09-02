@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.OBSERVED_AT;
 import static egm.io.nifi.processors.ngsild.model.PostgreSQLConstants.POSTGRESQL_MAX_NAME_LEN;
 
 public class PostgreSQLTransformer {
@@ -127,7 +128,9 @@ public class PostgreSQLTransformer {
     }
 
     private String encodeTimePropertyToColumnName(String encodedAttributeName, String timeProperty) {
-        String encodedName = encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(timeProperty);
+        String encodedName = Objects.equals(timeProperty, OBSERVED_AT) && !Objects.equals(encodedAttributeName, GENERIC_MEASURE)
+                ? PostgreSQLUtils.encodePostgreSQL(timeProperty)
+                : encodedAttributeName + "_" + PostgreSQLUtils.encodePostgreSQL(timeProperty);
         return PostgreSQLUtils.truncateToMaxPgSize(encodedName).toLowerCase();
     }
 
