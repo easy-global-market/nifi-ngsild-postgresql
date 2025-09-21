@@ -1,47 +1,45 @@
-# NiFi NGSI-LD PostgreSQL Processor
+# NiFi NGSI-LD to PostgreSQL Processor
 
 ## Presentation
 
-The NiFi NGSI-LD PostgreSQL Processor is a specialized Apache NiFi extension that provides seamless integration between
-FIWARE Context Brokers and PostgreSQL databases. This Generic Enabler automatically transforms NGSI-LD data into
+The NiFi NGSI-LD to PostgreSQL Processor is an Apache NiFi processor that provides seamless integration between
+NGSI-LD Context Brokers and PostgreSQL databases. This processor automatically transforms NGSI-LD data into
 structured relational database tables, enabling real-time data warehousing and analytics capabilities for FIWARE ecosystems.
 
 Key features include:
-- **Automatic Database Schema Generation**: Dynamically creates PostgreSQL tables based on NGSI-LD entity structures, eliminating manual database design
+- **Automatic Database Schema Generation**: Dynamically creates PostgreSQL tables based on NGSI-LD entities types, eliminating manual database design
 - **NGSI-LD Standard Compliance**: Full support for NGSI-LD temporal data, multi-attributes, relationships, and system attributes (createdAt, modifiedAt, observedAt)
-- **Flexible Data Transformation**: Configurable flattening of observations, attribute filtering, and customizable table naming conventions
+- **Flexible Data Transformation**: Configurable flattening of observations, attribute filtering, customizable table naming conventions, ...
 - **Enterprise-Grade Processing**: Batch processing support, connection pooling, error handling, and retry mechanisms for production environments
-- **Temporal Data Support**: Native handling of time-series data with proper temporal attribute management
-- **First level relationships support**: Leverage Linked Entity Retrieval to export data for first-level relationships into the same table as the main entity
+- **Data denormalization**: Leverage NGSI-LD Linked Entity Retrieval to export data from first-level relationships into the same table as the main entity
 
-The processor integrates seamlessly with existing NiFi data flows, allowing organizations to build comprehensive data
-pipelines that connect FIWARE-enabled IoT devices and applications directly to their analytical infrastructure.
+The processor allows organizations to build comprehensive data pipelines that connect FIWARE-enabled IoT devices and 
+applications directly to their analytical infrastructure.
 
-## Why using it?
+## Why use it?
 
-Modern smart city and IoT deployments generate massive volumes of context data that need to be stored, analyzed, and
+Modern smart city and IoT deployments generate massive volumes of data that need to be stored, analyzed, and
 visualized for actionable insights. Traditional approaches require complex custom integrations between FIWARE components
 and database systems, leading to development overhead and maintenance challenges.
 
-This Generic Enabler eliminates the integration complexity by providing a production-ready, standards-compliant solution
-that bridges the gap between FIWARE's context management capabilities and enterprise data analytics platforms.
-Organizations can immediately start collecting and analyzing their NGSI-LD data without investing in custom development
-or dealing with format conversion complexities.
+This processor eliminates the integration complexity by providing a production-ready, standards-compliant solution
+that bridges the gap between NGSI-LD Context Brokers and enterprise data analytics platforms.
+Organizations can immediately start analyzing their data without investing in custom development or dealing with
+format conversion complexities.
 
 ## Developer guidelines
 
 ### Overview
 
-The NiFi NGSI-LD PostgreSQL Processor is a specialized Apache NiFi extension that transforms NGSI-LD data streams into structured PostgreSQL database tables. This guide provides developers with the information needed to understand, build, modify, and contribute to the project.
+This section provides developers with the information needed to understand, build, modify, and contribute to the project.
 
 ### Prerequisites
 
-- **Java Development Kit (JDK) 21 or higher**
-- **Apache Maven 3.6.0 or higher**
-- **Docker** (for running integration tests with TestContainers)
-- **PostgreSQL 16 or higher, with PostGIS extension** (for local development and testing)
-- **Git** for version control
-- **IDE** with Maven support (IntelliJ IDEA, Eclipse, VS Code)
+- Java Development Kit (JDK) 21 or higher
+- Apache Maven 3.6.0 or higher
+- Docker (for running integration tests with TestContainers)
+- PostgreSQL 16 or higher, with PostGIS extension (for local development and testing)
+- Git for version control
 
 ### Project Structure
 
@@ -61,180 +59,163 @@ nifi-ngsild-postgresql/
 
 ### Building the Project
 
-1. **Clone the repository:**
+1. Clone the repository
+
    ```bash
    git clone https://github.com/easy-global-market/nifi-ngsild-postgresql
    cd nifi-ngsild-postgresql
    ```
 
-2. **Build the entire project:**
+2. Build the project
+
    ```bash
    mvn clean compile
    ```
 
-3. **Run tests:**
+3. Run tests
+
    ```bash
    mvn test
    ```
+
    Note: Integration tests require Docker to be running as they use TestContainers for PostgreSQL.
 
-4. **Package the NAR file:**
+4. Package the NAR file
+
    ```bash
    mvn clean package
    ```
+
    This creates the deployable NAR file in `nifi-ngsild-postgresql-nar/target/`.
 
 ### Running Tests
 
 The project includes comprehensive unit and integration tests:
 
-- **Unit Tests**: Test individual components and logic
-- **Integration Tests**: Use TestContainers to spin up PostgreSQL instances for realistic testing
+- Unit Tests: Test individual components and logic
+- Integration Tests: Use TestContainers to spin up PostgreSQL instances for realistic testing
 
-**Test execution:**
-```bash
-# Run all tests
-mvn test
+Test execution:
 
-# Run specific test class
-mvn test -Dtest=TestNgsiLdToPostgreSQL
+   ```bash
+   # Run all tests
+   mvn test
+   
+   # Run specific test class
+   mvn test -Dtest=TestNgsiLdToPostgreSQL
+   
+   # Skip integration tests (if Docker is not available)
+   mvn test -DskipITs=true
+   ```
 
-# Skip integration tests (if Docker is not available)
-mvn test -DskipITs=true
-```
-
-**Test Configuration:**
+Test Configuration:
 - Tests use `postgis/postgis:16-3.5-alpine` Docker image
 - Automatic database cleanup after each test
 - Mock NiFi environment for processor testing
 
 ## Installation Guidelines
 
-### System Requirements
+### Requirements
 
-- **Operating System**: Linux, macOS, or Windows
-- **Java Runtime Environment (JRE)**: Java 21 or higher
-- **Apache NiFi**: Version 2.4.0 or higher
-- **PostgreSQL Database**: Version 16 or higher, with PostGIS extension
-- **Memory**: Minimum 4GB RAM recommended for NiFi with this processor
-- **Storage**: Sufficient disk space for NiFi installation and database storage
-
-### Software Dependencies
-
-1. **Apache NiFi 2.4.0+**
-    - Download from: https://nifi.apache.org/download/
-    - Follow NiFi installation guide for your platform
-
-2. **PostgreSQL Database**
-    - Can be local or remote installation
-    - Ensure network connectivity from NiFi instance
-    - Required permissions: CREATE SCHEMA, CREATE TABLE, INSERT, SELECT
-
-3. **PostgreSQL JDBC Driver**
-    - Version 42.7.7 or compatible recommended
+- Apache NiFi: Version 2.4.0 or higher
+  - With PostgreSQL JDBC driver version 42.7.6 or higher
+- PostgreSQL Database: Version 16 or higher, with PostGIS extension installed and enabled
+  - Can be local or remote. Ensure network connectivity from NiFi instance.
+- Follow [NiFi System Administrator's Guide](https://nifi.apache.org/nifi-docs/administration-guide.html) for other system requirements and recommendations
 
 ### Installation Methods
 
 #### Method 1: Pre-built NAR Installation
 
-1. **Download the NAR file:**
+1. Download the NAR file
    ```bash
    wget https://github.com/easy-global-market/nifi-ngsild-postgresql/releases/download/2.4.0/nifi-ngsild-postgresql-nar-2.4.0.nar
    ```
 
-2. **Copy NAR to NiFi:**
+2. Copy NAR and JDBC driver to NiFi
    ```bash
    cp nifi-ngsild-postgresql-nar-2.4.0.nar $NIFI_HOME/lib/
+   cp postgresql-42.7.6.jar $NIFI_HOME/lib/
    ```
 
-3. **Restart NiFi:**
+3. Restart NiFi
    ```bash
    $NIFI_HOME/bin/nifi.sh restart
    ```
 
 #### Method 2: Build from Source
 
-1. **Prerequisites for building:**
-    - Java Development Kit (JDK) 21
-    - Apache Maven 3.6.0+
-    - Git
+1. See the [Developer Guidelines](#developer-guidelines) section for software requirements and project setup
 
-2. **Clone and build:**
+2. Build the NAR file
    ```bash
-   git clone https://github.com/easy-global-market/nifi-ngsild-postgresql
-   cd nifi-ngsild-postgresql
    mvn clean package
    ```
 
-3. **Install the built NAR:**
+3. Install the built NAR
    ```bash
    cp nifi-ngsild-postgresql-nar/target/nifi-ngsild-postgresql-nar-2.4.0.nar $NIFI_HOME/lib/
    ```
 
-4. **Restart NiFi:**
+4. Restart NiFi
    ```bash
    $NIFI_HOME/bin/nifi.sh restart
-   ```
-
-### Method 3: Docker Environment
-
-1. **Create Dockerfile extending NiFi:**
-   ```dockerfile
-   FROM apache/nifi:2.4.0
-   COPY nifi-ngsild-postgresql-nar-2.4.0.nar /opt/nifi/nifi-current/lib/
-   ```
-
-2. **Build and run:**
-   ```bash
-   docker build -t nifi-ngsild-postgresql .
-   docker run -d -p 8443:8443 nifi-ngsild-postgresql
    ```
 
 ## NiFi Configuration
 
 ### Database Connection Pool Setup
 
-1. **Access NiFi UI:**
+1. Access NiFi UI
     - Navigate to https://localhost:8443/nifi
     - Login with NiFi credentials
 
-2. **Create DBCPConnectionPool Service:**
+2. Create DBCPConnectionPool Controller Service
     - Go to Controller Services
     - Add Controller Service → DBCPConnectionPool
     - Configure properties:
 
-   | Property | Value | Example |
-   |----------|--------|---------|
-   | Database Connection URL | jdbc:postgresql://host:port/database | jdbc:postgresql://localhost:5432/nifi_data |
-   | Database Driver Class Name | org.postgresql.Driver | org.postgresql.Driver |
-   | Database User | nifi_user | nifi_user |
-   | Password | secure_password | *********** |
-   | Max Wait Time | 500 millis | 500 millis |
-   | Max Total Connections | 8 | 8 |
+   | Property                   | Value                                | Example                                    |
+   |----------------------------|--------------------------------------|--------------------------------------------|
+   | Database Connection URL    | jdbc:postgresql://host:port/database | jdbc:postgresql://localhost:5432/nifi_data |
+   | Database Driver Class Name | org.postgresql.Driver                | org.postgresql.Driver                      |
+   | Database User              | nifi_user                            | nifi_user                                  |
+   | Password                   | secure_password                      | ***********                                |
+   | Max Wait Time              | 500 millis                           | 500 millis                                 |
+   | Max Total Connections      | 8                                    | 8                                          |
 
-3. **Enable the service:**
+3. Enable the service
     - Click enable
     - Verify service shows "Enabled" status
 
 ### Processor Configuration
 
-1. **Configure Required Properties:**
+1. Configure Required Properties
 
-   | Property | Description | Default | Example |
-   |----------|-------------|---------|---------|
-   | JDBC Connection Pool | Reference to DBCPConnectionPool | (required) | DBCPConnectionPool |
-   | Batch Size | FlowFiles per transaction | 10 | 100 |
+   | Property             | Description                     | Default    |
+   |----------------------|---------------------------------|------------|
+   | JDBC Connection Pool | Reference to DBCPConnectionPool | (required) |
+   | Batch Size           | FlowFiles per transaction       | 10         |
 
-2. **Configure Optional Properties:**
+2. Configure Optional Properties
 
-   | Property | Description | Default | Recommended |
-   |----------|-------------|---------|-------------|
-   | DB Schema | Target database schema | stellio | stellio |
-   | Table Name Suffix | Suffix for table names | (none) | _data |
-   | Flatten Observations | Generic observation columns | false | false |
-   | Ignore Empty Observed At | Skip records without timestamps | true | true |
-   | Export System Attributes | Include createdAt, modifiedAt | false | true |
-   | Ignored Attributes | Comma-separated attribute list | (none) | id,type |
+   | Property                      | Description                      | Default              |
+   |-------------------------------|----------------------------------|----------------------|
+   | DB Schema                     | Target database schema           | stellio              |
+   | Table Name Suffix             | Suffix for table names           | (none)               |
+   | Flatten Observations          | Generic observation columns      | false                |
+   | Ignore Empty Observed At      | Skip records without timestamps  | true                 |
+   | Dataset id prefix to truncate | Truncate prefix from dataset ids | urn:ngsi-ld:Dataset: |
+   | Export System Attributes      | Include createdAt, modifiedAt    | false                |
+   | Ignored Attributes            | Comma-separated attribute list   | (none)               |
+
+### Sample Flows
+
+To help you get started, the project includes a [sample process group](./samples/exporter_process_group_definition.json)
+that demonstrates the processor's capabilities. It contains three process groups:
+- A process group that receives notifications and exports data to PostgreSQL
+- A process group to manually export temporal data
+- A process group to manually export the current state of entities
 
 ## Debugging and Troubleshooting
 
