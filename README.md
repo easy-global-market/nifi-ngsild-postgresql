@@ -1,5 +1,10 @@
 # NiFi NGSI-LD to PostgreSQL Processor
 
+[![License: Apache-2.0](https://img.shields.io/github/license/easy-global-market/nifi-ngsild-postgresql.svg)](https://spdx.org/licenses/Apache-2.0.html)
+<br>
+![Build](https://github.com/easy-global-market/nifi-ngsild-postgresql/actions/workflows/maven.yml/badge.svg)
+[![CodeQL](https://github.com/easy-global-market/nifi-ngsild-postgresql/actions/workflows/codeql.yml/badge.svg)](https://github.com/stellio-hub/stellio-context-broker/actions/workflows/codeql.yml)
+
 ## Presentation
 
 The NiFi NGSI-LD to PostgreSQL Processor is an Apache NiFi processor that provides seamless integration between
@@ -224,15 +229,14 @@ that demonstrates the processor's capabilities. It contains three process groups
 The processor uses SLF4J for logging. Configure logging levels in your NiFi environment:
 
 ```xml
-<!-- For debugging -->
 <logger name="egm.io.nifi.processors.ngsild" level="DEBUG"/>
 ```
 
 ## Resources
 
-- **Apache NiFi Documentation**: https://nifi.apache.org/docs.html
-- **NGSI-LD Specification**: https://www.etsi.org/deliver/etsi_gs/CIM/001_099/009/01.08.01_60/gs_cim009v010801p.pdf
-- **PostgreSQL Documentation**: https://www.postgresql.org/docs/
+- Apache NiFi Documentation: https://nifi.apache.org/docs.html
+- NGSI-LD Specification: https://www.etsi.org/deliver/etsi_gs/CIM/001_099/009/01.08.01_60/gs_cim009v010801p.pdf
+- PostgreSQL Documentation: https://www.postgresql.org/docs/
 
 ## Support
 
