@@ -141,7 +141,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.18</version> <!-- Use the latest version -->
+            <version>1.5.19</version> <!-- Use the latest version -->
             <scope>test</scope>
         </dependency>
         <dependency>
