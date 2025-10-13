@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.DEFAULT_CORE_CONTEXT_PREFIX;
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 
 public class NgsiLdUtils {
@@ -189,7 +190,7 @@ public class NgsiLdUtils {
             subAttributes.add(parameterDatasetId);
             return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
         } else {
-            return new Attribute(key.toLowerCase(), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
+            return new Attribute(normalizeAttributeName(key), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
         }
     }
 
@@ -206,7 +207,7 @@ public class NgsiLdUtils {
             subAttrValue = value.get("json").toString();
         }
 
-        return new Attribute(key.toLowerCase(), subAttrType, "", "", "", "", subAttrValue, false, null);
+        return new Attribute(normalizeAttributeName(key), subAttrType, "", "", "", "", subAttrValue, false, null);
     }
 
     // When this processor is used in a flow with a `Join Enrichment` processor, it harmonizes JSON among all processed entities,
@@ -219,5 +220,10 @@ public class NgsiLdUtils {
             attribute.getAttrValue() != null &&
             !Objects.equals(attribute.getAttrValue().toString(), "null"))
             attributes.add(attribute);
+    }
+
+    private static String normalizeAttributeName(String attributeName) {
+        // Try to prevent from some JSON-LD contexts problems where an attribute ends up on the default vocab
+        return attributeName.replace(DEFAULT_CORE_CONTEXT_PREFIX, "").toLowerCase();
     }
 }

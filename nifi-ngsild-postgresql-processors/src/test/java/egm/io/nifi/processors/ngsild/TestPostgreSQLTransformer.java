@@ -55,7 +55,7 @@ public class TestPostgreSQLTransformer {
         Entity entity = new Entity("someId", "someType", null, entityAttrs);
 
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields = pgTransformer.listOfFields(entity, "", false, Collections.emptySet());
-        List<String> expList = Arrays.asList("entityId", "entityType", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
+        List<String> expList = Arrays.asList("entityId", "entityType", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "observedat");
         Set<String> expectedListOfFields = new HashSet<>(expList);
 
         assertEquals(expectedListOfFields, listOfFields.keySet());
@@ -69,7 +69,7 @@ public class TestPostgreSQLTransformer {
         Entity entity = new Entity("someId", "someType", Set.of("S_UseCase/S_Instance"), entityAttrs);
 
             Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields = pgTransformer.listOfFields(entity, "", false, Collections.emptySet());
-            Set<String> expectedListOfFields = Set.of("entityId", "entityType", "scopes", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "someattr_urn_ngsi_ld_dataset_01_observedat");
+            Set<String> expectedListOfFields = Set.of("entityId", "entityType", "scopes", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "observedat");
             assertEquals(expectedListOfFields, listOfFields.keySet());
 
             List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, 1562561734983L, "", false, false, false);
@@ -85,7 +85,7 @@ public class TestPostgreSQLTransformer {
 
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields = pgTransformer.listOfFields(entity, "", false, Collections.emptySet());
         List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
-        List<String> expectedValuesForInsert = List.of("('someId','someType','2019-07-08T04:55:34.983Z',12.0,'2023-02-16T00:00:00Z')");
+        List<String> expectedValuesForInsert = List.of("('someId','someType','2023-02-16T00:00:00Z','2019-07-08T04:55:34.983Z',12.0)");
         assertEquals(expectedValuesForInsert, valuesForInsert);
     }
 
@@ -126,7 +126,7 @@ public class TestPostgreSQLTransformer {
 
         assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredsubattr")));
         // values for ignored sub-attribute should not be in the values for insert
-        assertEquals(7, valuesForInsert.get(0).split(",").length);
+        assertEquals(6, valuesForInsert.get(0).split(",").length);
     }
 
     @Test
