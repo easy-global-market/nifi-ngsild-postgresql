@@ -1,6 +1,6 @@
 [
   {
-    "id": "urn:ngsi-ld:Distribution:Zone:104-P-006:8848eb33fdff7304cb21b0a372679ea76423c52f3cd5d5fdf0ace6ed86810da4",
+    "id": "urn:ngsi-ld:Distribution:Zone:104-P-006:001",
     "type": "Distribution",
     "title": {
       "type": "Property",

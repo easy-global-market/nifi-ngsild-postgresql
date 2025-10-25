@@ -204,19 +204,15 @@ public class PostgreSQLTransformer {
                 if (hasObservations || !ignoreEmptyObservedAt)
                     valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
             } else {
-                // when flattening observations, there may have more than one row per observation date
-                List<Attribute> attributes = attributesByObservedAt.get(observedTimestamp);
-                List<Attribute> commonAttributes =
-                    attributes.stream()
-                        .filter(attribute -> !Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                        .toList();
                 // first fill with the common attributes (the non-observed ones)
-                for (Attribute commonAttribute : commonAttributes) {
+                for (Attribute commonAttribute : attributesWithoutObservedAt) {
                     Map<String, String> attributesValues =
                         insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
                             creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
                     valuesForColumns.putAll(attributesValues);
                 }
+                // when flattening observations, there may have more than one row per observation date
+                List<Attribute> attributes = attributesByObservedAt.get(observedTimestamp);
                 List<Attribute> observedAttributes =
                     attributes.stream()
                         .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))

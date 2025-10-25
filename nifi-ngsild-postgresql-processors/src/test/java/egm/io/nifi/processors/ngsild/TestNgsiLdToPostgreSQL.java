@@ -25,7 +25,6 @@ import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.ERROR_MESSAGE_ATT
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.IGNORE_EMPTY_OBSERVED_AT;
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 public class TestNgsiLdToPostgreSQL {
@@ -56,7 +55,12 @@ public class TestNgsiLdToPostgreSQL {
         runner.assertValid(connectionPool);
     }
 
-    public void compareColumns(Connection connection, List<String> expectedColumns,  String schema, String tableName) throws SQLException {
+    public void checkColumns(
+        Connection connection,
+        String schema,
+        String tableName,
+        List<String> expectedColumns
+    ) throws SQLException {
         Set<String> expectedColumnsSet = new HashSet<>(expectedColumns);
 
         DatabaseMetaData metaData = connection.getMetaData();
@@ -72,7 +76,12 @@ public class TestNgsiLdToPostgreSQL {
         assertEquals(expectedColumnsSet, actualColumnsSet, "The columns in the table do not match the expected columns.");
     }
 
-    public void compareRowCount(Connection connection, int expectedRowCount, String schema, String tableName) throws SQLException {
+    public void checkRowCount(
+        Connection connection,
+        String schema,
+        String tableName,
+        int expectedRowCount
+    ) throws SQLException {
         String query = String.format("SELECT COUNT(*) FROM %s.%s", schema, tableName);
         try (Statement statement = connection.createStatement()) {
             ResultSet resultSet = statement.executeQuery(query);
@@ -81,6 +90,32 @@ public class TestNgsiLdToPostgreSQL {
             int actualRowCount = resultSet.getInt(1);
 
             assertEquals(expectedRowCount, actualRowCount, "The number of rows in the table do not match the expected number of rows.");
+        }
+    }
+
+    public void checkColumnValue(
+        Connection connection,
+        String schema,
+        String tableName,
+        int rowNumber,
+        String entityId,
+        String columnName,
+        String expectedColumnValue
+    ) throws SQLException {
+        String query = String.format(
+            "SELECT %s FROM %s.%s WHERE entityid = '%s'",
+            columnName,
+            schema,
+            tableName,
+            entityId
+        );
+        try (Statement statement = connection.createStatement()) {
+            ResultSet resultSet = statement.executeQuery(query);
+
+            while (resultSet.getRow() < rowNumber) resultSet.next();
+            String actualColumnValue = resultSet.getString(columnName);
+
+            assertEquals(expectedColumnValue, actualColumnValue, "The actual value of the column does not match the expected value.");
         }
     }
 
@@ -117,8 +152,8 @@ public class TestNgsiLdToPostgreSQL {
 
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
-            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+            checkRowCount(connection, "public", "shellfishtable", expectedRowCount);
+            checkColumns(connection, "public", "shellfishtable", expectedColumns);
         }
         finally {
             dropTable("public", "shellfishtable");
@@ -160,8 +195,8 @@ public class TestNgsiLdToPostgreSQL {
 
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
-            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+            checkRowCount(connection, "public", "shellfishtable", expectedRowCount);
+            checkColumns(connection, "public", "shellfishtable", expectedColumns);
         }
         finally {
             dropTable("public", "shellfishtable");
@@ -203,8 +238,8 @@ public class TestNgsiLdToPostgreSQL {
 
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "private", "shellfishtable_suffix");
-            compareColumns(connection, expectedColumns, "private", "shellfishtable_suffix");
+            checkRowCount(connection, "private", "shellfishtable_suffix", expectedRowCount);
+            checkColumns(connection, "private", "shellfishtable_suffix", expectedColumns);
         }
         finally {
             dropTable("private", "shellfishtable_suffix");
@@ -242,12 +277,9 @@ public class TestNgsiLdToPostgreSQL {
                 "recvtime"
         );
 
-
-
-
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "shellfishtable");
-            compareColumns(connection, expectedColumns, "public", "shellfishtable");
+            checkRowCount(connection, "public", "shellfishtable", expectedRowCount);
+            checkColumns(connection, "public", "shellfishtable", expectedColumns);
         }
         finally {
             dropTable("public", "shellfishtable");
@@ -301,8 +333,8 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
         }
         finally {
             dropTable("public", "distribution");
@@ -345,8 +377,8 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
         }
         finally {
             dropTable("public", "distribution");
@@ -395,8 +427,28 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
+            for (int rowNumber = 1; rowNumber <= 2; rowNumber++) {
+                checkColumnValue(
+                    connection,
+                    "public",
+                    "distribution",
+                    rowNumber,
+                    "urn:ngsi-ld:Distribution:Zone:104-P-006:001",
+                    "stationcode",
+                    "104-P-006"
+                );
+                checkColumnValue(
+                    connection,
+                    "public",
+                    "distribution",
+                    rowNumber,
+                    "urn:ngsi-ld:Distribution:Zone:104-P-006:001",
+                    "servesdataset_title",
+                    "Surveillance littorale (Microbiologie - Microbiologie/Bactéries tests)"
+                );
+            }
         }
         finally {
             dropTable("public", "distribution");
@@ -443,8 +495,8 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
         }
         finally {
             dropTable("public", "distribution");
@@ -512,8 +564,8 @@ public class TestNgsiLdToPostgreSQL {
 
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
         }
         finally {
             dropTable("public", "distribution");
@@ -552,8 +604,8 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
         }
         finally {
             dropTable("public", "distribution");
@@ -601,8 +653,28 @@ public class TestNgsiLdToPostgreSQL {
         );
 
         try (final Connection connection = postgreSQLContainer.createConnection("")) {
-            compareRowCount(connection, expectedRowCount, "public", "distribution");
-            compareColumns(connection, expectedColumns, "public", "distribution");
+            checkRowCount(connection, "public", "distribution", expectedRowCount);
+            checkColumns(connection, "public", "distribution", expectedColumns);
+            for (int rowNumber = 1; rowNumber <= 4; rowNumber++) {
+                checkColumnValue(
+                    connection,
+                    "public",
+                    "distribution",
+                    rowNumber,
+                    "urn:ngsi-ld:Distribution:MicrobiologieDREAL:P6",
+                    "stationcode",
+                    "P6"
+                );
+                checkColumnValue(
+                    connection,
+                    "public",
+                    "distribution",
+                    rowNumber,
+                    "urn:ngsi-ld:Distribution:MicrobiologieDREAL:P6",
+                    "servesdataset_title",
+                    "Microbiologie DREAL - SMBT"
+                );
+            }
         }
         finally {
             dropTable("public", "distribution");
