@@ -11,7 +11,7 @@ pipeline {
         }
         stage('Build, test and package') {
             steps {
-                sh './mvnw -B package --file pom.xml'
+                sh './mvnw -B clean package'
             }
         }
     }
