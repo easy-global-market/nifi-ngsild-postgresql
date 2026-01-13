@@ -267,7 +267,6 @@ public class TestNgsiLdToPostgreSQL {
         }
     }
 
-
     @Test
     public void currentStateFlattenExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");

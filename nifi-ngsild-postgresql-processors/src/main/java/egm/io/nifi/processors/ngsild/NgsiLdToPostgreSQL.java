@@ -105,8 +105,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
     protected static final PropertyDescriptor REPLACE_MODE = new PropertyDescriptor.Builder()
         .name("replace-mode")
         .displayName("Replace mode")
-        .description("true or false, true for deleting all existing rows for the received entity IDs from the " +
-                "table before inserting the new data.")
+        .description("true or false, true for deleting all existing data for the received entity IDs before " +
+                "inserting the new data.")
         .required(false)
         .defaultValue("false")
         .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
@@ -285,7 +285,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                         conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
                         if (replaceMode) {
                             String deleteSql = postgres.deleteEntityQuery(schemaName, tableName, entity.entityId);
-                            getLogger().debug("Deleting existing rows for entity: {}", deleteSql);
+                            getLogger().debug("Deleting existing rows for entity: {}", entity.entityId);
                             conn.createStatement().execute(deleteSql);
                         }
                         ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
