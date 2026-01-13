@@ -247,6 +247,27 @@ public class TestNgsiLdToPostgreSQL {
     }
 
     @Test
+    public void testDeleteBeforeInsert() throws IOException, SQLException {
+        runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(REPLACE_MODE, "true");
+
+        byte[] content = loadTestFile("entity-current.jsonld").getBytes();
+        runner.enqueue(content);
+        runner.run();
+        runner.assertTransferCount(REL_SUCCESS, 1);
+
+        runner.enqueue(content);
+        runner.run();
+        runner.assertTransferCount(REL_SUCCESS, 2);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            checkRowCount(connection, "public", "shellfishtable", 1);
+        } finally {
+            dropTable("public", "shellfishtable");
+        }
+    }
+
+    @Test
     public void currentStateFlattenExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
         runner.setProperty(FLATTEN_OBSERVATIONS, "true");

@@ -102,6 +102,16 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
+    protected static final PropertyDescriptor REPLACE_MODE = new PropertyDescriptor.Builder()
+        .name("replace-mode")
+        .displayName("Replace mode")
+        .description("true or false, true for deleting all existing data for the received entity IDs before " +
+                "inserting the new data.")
+        .required(false)
+        .defaultValue("false")
+        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+        .build();
     protected static final PropertyDescriptor DATASETID_PREFIX_TRUNCATE = new PropertyDescriptor.Builder()
         .name("datasetid-prefix-truncate")
         .displayName("Dataset id prefix to truncate")
@@ -162,6 +172,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(TABLE_NAME_SUFFIX);
         properties.add(FLATTEN_OBSERVATIONS);
         properties.add(IGNORE_EMPTY_OBSERVED_AT);
+        properties.add(REPLACE_MODE);
         properties.add(DATASETID_PREFIX_TRUNCATE);
         properties.add(EXPORT_SYSATTRS);
         properties.add(IGNORED_ATTRIBUTES);
@@ -217,6 +228,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
             final boolean flattenObservations = context.getProperty(FLATTEN_OBSERVATIONS).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
+            final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
             final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, flattenObservations, session);
             final long creationTime = event.getCreationTime();
             try {
@@ -271,6 +283,11 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                         conn.createStatement().execute(postgres.createSchema(schemaName));
                         getLogger().debug("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
                         conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
+                        if (replaceMode) {
+                            String deleteSql = postgres.deleteEntityQuery(schemaName, tableName, entity.entityId);
+                            getLogger().debug("Deleting existing rows for entity: {}", entity.entityId);
+                            conn.createStatement().execute(deleteSql);
+                        }
                         ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
                         Map<String, POSTGRESQL_COLUMN_TYPES> newColumns = postgres.getNewColumns(rs, updatedListOfTypedFields);
                         if (!newColumns.isEmpty()) {

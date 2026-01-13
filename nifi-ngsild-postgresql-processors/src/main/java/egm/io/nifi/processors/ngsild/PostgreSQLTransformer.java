@@ -420,6 +420,10 @@ public class PostgreSQLTransformer {
         return "select column_name, udt_name from information_schema.columns where table_name ='" + tableName + "';";
     }
 
+    public String deleteEntityQuery(String schemaName, String tableName, String entityId) {
+        return "delete from " + schemaName + "." + tableName + " where " + PostgreSQLConstants.ENTITY_ID + " = '" + entityId + "';";
+    }
+
     public Map<String, POSTGRESQL_COLUMN_TYPES> getUpdatedListOfTypedFields(ResultSet rs, Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields) throws SQLException {
         // create an initial map containing all the fields with columns names in lowercase
         // Get the column names; column indices start from 1
