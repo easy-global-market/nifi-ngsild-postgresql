@@ -59,6 +59,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final String DEFAULT_DB_SCHEMA = "stellio";
 
+    public static final String EXPORT_EXPANDED = "Expanded";
+    public static final String EXPORT_FLATTEN = "Flatten On Observed Attributes ";
+    public static final String EXPORT_SEMI_FLATTEN = "Flatten On Multi-Instances Attributes";
+
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
         .name("connection-pool")
         .displayName("JDBC Connection Pool")
@@ -84,14 +88,16 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
-    protected static final PropertyDescriptor FLATTEN_OBSERVATIONS = new PropertyDescriptor.Builder()
-        .name("flatten-observations")
-        .displayName("Flatten observations")
-        .description("true or false, true for exporting observed attributes in a group of generic columns.")
-        .required(false)
-        .defaultValue("false")
-        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+    protected static final PropertyDescriptor EXPORT_MODE = new PropertyDescriptor.Builder()
+        .name("export-mode")
+        .displayName("Export mode")
+        .description("The mode used to export NGSI-LD attributes to database columns. " +
+            "Expanded: one column per attribute; " +
+            "Flatten: generic columns for all observations; " +
+            "Flatten On Multi-Instances Attributes : one column per attribute name with an associated datasetId column.")
+        .required(true)
+        .defaultValue(EXPORT_EXPANDED)
+        .allowableValues(EXPORT_EXPANDED, EXPORT_FLATTEN, EXPORT_SEMI_FLATTEN)
         .build();
     protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
         .name("ignore-empty-observed-at")
@@ -99,16 +105,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .description("true or false, true for ignoring rows without any observation date.")
         .required(false)
         .defaultValue("true")
-        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-        .build();
-    protected static final PropertyDescriptor REPLACE_MODE = new PropertyDescriptor.Builder()
-        .name("replace-mode")
-        .displayName("Replace mode")
-        .description("true or false, true for deleting all existing rows for the received entity IDs from the " +
-                "table before inserting the new data.")
-        .required(false)
-        .defaultValue("false")
         .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
@@ -170,9 +166,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(CONNECTION_POOL);
         properties.add(DB_SCHEMA);
         properties.add(TABLE_NAME_SUFFIX);
-        properties.add(FLATTEN_OBSERVATIONS);
+        properties.add(EXPORT_MODE);
         properties.add(IGNORE_EMPTY_OBSERVED_AT);
-        properties.add(REPLACE_MODE);
         properties.add(DATASETID_PREFIX_TRUNCATE);
         properties.add(EXPORT_SYSATTRS);
         properties.add(IGNORED_ATTRIBUTES);
@@ -226,10 +221,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             if (dbSchema == null || dbSchema.isEmpty())
                 dbSchema = DEFAULT_DB_SCHEMA;
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
-            final boolean flattenObservations = context.getProperty(FLATTEN_OBSERVATIONS).evaluateAttributeExpressions(flowFile).asBoolean();
+            final String exportMode = context.getProperty(EXPORT_MODE).getValue();
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
-            final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
-            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, flattenObservations, session);
+            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);
             final long creationTime = event.getCreationTime();
             try {
                 final String schemaName = postgres.buildSchemaName(dbSchema);
@@ -264,7 +258,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                             context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
                             context.getProperty(EXPORT_SYSATTRS).asBoolean(),
                             ignoreEmptyObservedAt,
-                            flattenObservations
+                            exportMode
                         );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.
@@ -283,11 +277,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                         conn.createStatement().execute(postgres.createSchema(schemaName));
                         getLogger().debug("Gonna create table {} with columns {}", tableName, updatedListOfTypedFields);
                         conn.createStatement().execute(postgres.createTable(schemaName, tableName, updatedListOfTypedFields));
-                        if (replaceMode) {
-                            String deleteSql = postgres.deleteEntityQuery(schemaName, tableName, entity.entityId);
-                            getLogger().debug("Deleting existing rows for entity: {}", deleteSql);
-                            conn.createStatement().execute(deleteSql);
-                        }
                         ResultSet rs = conn.createStatement().executeQuery(postgres.checkColumnNames(tableName));
                         Map<String, POSTGRESQL_COLUMN_TYPES> newColumns = postgres.getNewColumns(rs, updatedListOfTypedFields);
                         if (!newColumns.isEmpty()) {
