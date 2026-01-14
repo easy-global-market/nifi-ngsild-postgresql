@@ -16,6 +16,10 @@ import java.util.stream.Collectors;
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 import static org.junit.jupiter.api.Assertions.*;
 
+import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_EXPANDED;
+import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_FLATTEN;
+import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_SEMI_FLATTEN;
+
 public class TestNgsiLdUtils {
 
     private String loadTestFile(String filename) throws IOException {
@@ -25,7 +29,7 @@ public class TestNgsiLdUtils {
     @Test
     public void testTemporalEntities() throws IOException {
         String data = loadTestFile("temporalEntities.json");
-        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), false);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), EXPORT_EXPANDED);
         assertEquals(2, entities.size());
 
         List<Attribute> attributes = entities.getFirst().entityAttrs;
@@ -36,7 +40,7 @@ public class TestNgsiLdUtils {
     @Test
     public void verifyIfAttributesAreCompliant() throws IOException {
         String data = loadTestFile("temporalEntities.json");
-        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), false);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), EXPORT_EXPANDED);
         assertTrue(entities.stream().allMatch(
             entity -> entity.entityAttrs.stream()
                 .allMatch(attributes ->
@@ -49,7 +53,7 @@ public class TestNgsiLdUtils {
     @Test
     public void testEntityWithFlattenObservations() throws IOException {
         String data = loadTestFile("entity-temporal.jsonld");
-        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), true);
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), EXPORT_FLATTEN);
         assertEquals(1, entities.size());
         Entity entity = entities.getFirst();
         List<Attribute> attributes = entity.entityAttrs;

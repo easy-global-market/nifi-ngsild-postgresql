@@ -1,0 +1,135 @@
+[
+    {
+        "id": "urn:ngsi-ld:Distribution:TEST",
+        "type": "Distribution",
+        "name": {
+            "type": "Property",
+            "value": "Distribution TEST"
+        },
+        "surface": {
+            "type": "Property",
+            "value": 100,
+            "unitCode": "MTK"
+        },
+        "belongsTo": {
+            "type": "Relationship",
+            "object": "urn:ngsi-ld:IrrigationArea:TEST"
+        },
+        "valveNumber": {
+            "type": "Property",
+            "value": 1
+        },
+        "wateringProgram": [
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Algorithm:Recommendation",
+                "instanceId": "urn:ngsi-ld:Instance:9e414dc4-6288-4587-b67a-d613d29c5ad2",
+                "observedAt": "2025-08-13T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Algorithm:Recommendation",
+                "instanceId": "urn:ngsi-ld:Instance:e78348df-efcb-4ddf-8a32-05edb1837091",
+                "observedAt": "2025-08-14T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Algorithm:Recommendation",
+                "instanceId": "urn:ngsi-ld:Instance:eea53541-851f-49d5-a70e-41c699449ae2",
+                "observedAt": "2025-08-15T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 15,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:08d7966d-2ff4-4df9-a169-5eb972749b9a",
+                "observedAt": "2025-08-13T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:3cb60cff-c620-4191-8308-8e4906597d61",
+                "observedAt": "2025-08-14T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:e12c488f-5a88-46af-b7da-6adedd7dfafc",
+                "observedAt": "2025-08-15T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default",
+                "instanceId": "urn:ngsi-ld:Instance:c3a2f21e-43dc-40f6-9904-f31d94b1992a",
+                "observedAt": "2025-08-13T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default",
+                "instanceId": "urn:ngsi-ld:Instance:46b6b411-f2c0-4393-8b80-6c90e934230d",
+                "observedAt": "2025-08-14T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Default",
+                "instanceId": "urn:ngsi-ld:Instance:aad91088-c316-4c3d-8033-95c496905781",
+                "observedAt": "2025-08-15T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Limited:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:982e5fff-f731-4576-8837-b98c23093d0c",
+                "observedAt": "2025-08-13T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Limited:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:40a41f4a-8428-455f-bc0c-9c49ec86c969",
+                "observedAt": "2025-08-14T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 0,
+                "unitCode": "MIN",
+                "datasetId": "urn:ngsi-ld:Dataset:Limited:Observed",
+                "instanceId": "urn:ngsi-ld:Instance:71120502-bee5-4972-a48d-8caf1cd5f8af",
+                "observedAt": "2025-08-15T16:00:00Z"
+            }
+        ],
+        "simpleAttribute": [
+            {
+                "type": "Property",
+                "value": 1,
+                "instanceId": "urn:ngsi-ld:Instance:9e414dc4-6288-4587-b67a-d613d29c5ad2",
+                "observedAt": "2025-08-15T16:00:00Z"
+            },
+            {
+                "type": "Property",
+                "value": 2,
+                "instanceId": "urn:ngsi-ld:Instance:9e414dc4-6288-4587-b67a-d613d29c5ad2",
+                "observedAt": "2026-01-01T16:00:00Z"
+            }
+        ]
+    }
+]
