@@ -2,6 +2,7 @@ package egm.io.nifi.processors.ngsild;
 
 import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import egm.io.nifi.processors.ngsild.model.NgsiLdConstants;
 import egm.io.nifi.processors.ngsild.model.PostgreSQLConstants;
 import egm.io.nifi.processors.ngsild.utils.*;
@@ -146,7 +147,7 @@ public class PostgreSQLTransformer {
         String datasetIdPrefixToTruncate,
         Boolean exportSysAttrs,
         Boolean ignoreEmptyObservedAt,
-        String exportMode
+        ExportMode exportMode
     ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
@@ -178,7 +179,7 @@ public class PostgreSQLTransformer {
             // 1. Handle non-temporal rows (Current State)
             if (observedTimestamp.isEmpty()) {
                 // Non-temporal row is only created for Expanded/Semi-Flatten and if explicitly allowed
-                if (ignoreEmptyObservedAt || NgsiLdToPostgreSQL.EXPORT_FLATTEN.equals(exportMode)) {
+                if (ignoreEmptyObservedAt || ExportMode.FLATTEN.equals(exportMode)) {
                     continue;
                 }
                 for (Attribute attribute : attributesWithoutObservedAt) {
@@ -198,7 +199,7 @@ public class PostgreSQLTransformer {
 
             List<Attribute> observedAttributes = attributesByObservedAt.get(observedTimestamp);
 
-            if (NgsiLdToPostgreSQL.EXPORT_EXPANDED.equals(exportMode)) {
+            if (ExportMode.EXPANDED.equals(exportMode)) {
                 // Expanded: Merge all attributes of the same timestamp into one row
                 for (Attribute attribute : observedAttributes) {
                     valuesForColumns.putAll(insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
@@ -411,7 +412,7 @@ public class PostgreSQLTransformer {
         String datasetIdPrefixToTruncate,
         Boolean exportSysAttrs,
         Boolean ignoreEmptyObservedAt,
-        String exportMode
+        ExportMode exportMode
     ) {
         List<String> valuesForInsert =
             this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, exportMode);

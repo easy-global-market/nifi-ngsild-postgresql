@@ -3,6 +3,7 @@ package egm.io.nifi.processors.ngsild.utils;
 import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.Event;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.stream.io.StreamUtils;
@@ -18,10 +19,6 @@ import java.util.stream.Collectors;
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.DEFAULT_CORE_CONTEXT_PREFIX;
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
 
-import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_FLATTEN;
-import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_SEMI_FLATTEN;
-
-
 public class NgsiLdUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(NgsiLdUtils.class);
@@ -30,7 +27,7 @@ public class NgsiLdUtils {
         List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
 
-    public static Event getEventFromFlowFile(FlowFile flowFile, String exportMode, final ProcessSession session) {
+    public static Event getEventFromFlowFile(FlowFile flowFile, ExportMode exportMode, final ProcessSession session) {
 
         final byte[] buffer = new byte[(int) flowFile.getSize()];
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
@@ -42,7 +39,7 @@ public class NgsiLdUtils {
         return new Event(flowFile.getEntryDate(), entities);
     }
 
-    public static List<Entity> parseNgsiLdEntities(JSONArray content, String exportMode) {
+    public static List<Entity> parseNgsiLdEntities(JSONArray content, ExportMode exportMode) {
         List<Entity> entities = new ArrayList<>();
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
@@ -105,7 +102,7 @@ public class NgsiLdUtils {
         }
     }
 
-    private static Attribute parseNgsiLdAttribute(String key, JSONObject value, String exportMode) {
+    private static Attribute parseNgsiLdAttribute(String key, JSONObject value, ExportMode exportMode) {
         // When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification -
         // if it has no history in the specified time range.
         // In this case, some flow file can give entity that contains attributes with only null values so attribute type can be set to null
@@ -117,8 +114,8 @@ public class NgsiLdUtils {
         Object attrValue;
         ArrayList<Attribute> subAttributes = new ArrayList<>();
 
-        boolean isFlatten = EXPORT_FLATTEN.equals(exportMode);
-        boolean isSemiFlatten = EXPORT_SEMI_FLATTEN.equals(exportMode);
+        boolean isFlatten = ExportMode.FLATTEN.equals(exportMode);
+        boolean isSemiFlatten = ExportMode.SEMI_FLATTEN.equals(exportMode);
 
         if ("Relationship".contentEquals(attrType)) {
             attrValue = value.get("object").toString();

@@ -3,6 +3,7 @@ package egm.io.nifi.processors.ngsild;
 import egm.io.nifi.processors.ngsild.PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES;
 import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.Event;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import egm.io.nifi.processors.ngsild.utils.NgsiLdUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -59,10 +60,6 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     protected static final String DEFAULT_DB_SCHEMA = "stellio";
 
-    public static final String EXPORT_EXPANDED = "Expanded";
-    public static final String EXPORT_FLATTEN = "Flatten On Observed Attributes ";
-    public static final String EXPORT_SEMI_FLATTEN = "Flatten On Multi-Instances Attributes";
-
     protected static final PropertyDescriptor CONNECTION_POOL = new PropertyDescriptor.Builder()
         .name("connection-pool")
         .displayName("JDBC Connection Pool")
@@ -96,8 +93,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             "Flatten: generic columns for all observations; " +
             "Flatten On Multi-Instances Attributes : one column per attribute name with an associated datasetId column.")
         .required(true)
-        .defaultValue(EXPORT_EXPANDED)
-        .allowableValues(EXPORT_EXPANDED, EXPORT_FLATTEN, EXPORT_SEMI_FLATTEN)
+        .allowableValues(ExportMode.class)
+        .defaultValue(ExportMode.EXPANDED)
         .build();
     protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
         .name("ignore-empty-observed-at")
@@ -232,7 +229,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             if (dbSchema == null || dbSchema.isEmpty())
                 dbSchema = DEFAULT_DB_SCHEMA;
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
-            final String exportMode = context.getProperty(EXPORT_MODE).getValue();
+            final ExportMode exportMode = ExportMode.valueOf(context.getProperty(EXPORT_MODE).getValue());
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
             final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);

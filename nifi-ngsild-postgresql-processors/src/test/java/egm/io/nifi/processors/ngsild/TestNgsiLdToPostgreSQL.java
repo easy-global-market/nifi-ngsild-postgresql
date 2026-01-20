@@ -1,5 +1,6 @@
 package egm.io.nifi.processors.ngsild;
 
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import org.apache.nifi.dbcp.DBCPConnectionPool;
 import org.apache.nifi.dbcp.utils.DBCPProperties;
 import org.apache.nifi.processor.exception.ProcessException;
@@ -24,11 +25,8 @@ import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.*;
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.ERROR_MESSAGE_ATTR;
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.IGNORE_EMPTY_OBSERVED_AT;
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX;
+import static egm.io.nifi.processors.ngsild.utils.TestUtils.printTableContent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_EXPANDED;
-import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_FLATTEN;
-import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.EXPORT_SEMI_FLATTEN;
 
 @Testcontainers
 public class TestNgsiLdToPostgreSQL {
@@ -123,29 +121,10 @@ public class TestNgsiLdToPostgreSQL {
         }
     }
 
-    private void printTableContent(Connection connection, String schema, String tableName) throws SQLException {
-        String query = String.format("SELECT * FROM %s.%s", schema, tableName);
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(query)) {
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
-            System.out.println("--- Table Content: " + schema + "." + tableName + " ---");
-            while (resultSet.next()) {
-                StringBuilder row = new StringBuilder();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.append(metaData.getColumnName(i)).append(": ").append(resultSet.getString(i)).append(" | ");
-                }
-                System.out.println(row);
-            }
-            System.out.println("------------------------------------------");
-        }
-    }
-
     @Test
     public void currentStateDefaultExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -186,7 +165,7 @@ public class TestNgsiLdToPostgreSQL {
     @Test
     public void currentStateDefaultExportBatch() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
@@ -229,7 +208,7 @@ public class TestNgsiLdToPostgreSQL {
     @Test
     public void currentStateDefaultExportSchemaAndTableNameSuffix() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.setProperty(DB_SCHEMA, "private");
         runner.setProperty(TABLE_NAME_SUFFIX, "suffix");
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
@@ -293,7 +272,7 @@ public class TestNgsiLdToPostgreSQL {
     @Test
     public void currentStateFlattenExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.setProperty(EXPORT_MODE, EXPORT_FLATTEN);
+        runner.setProperty(EXPORT_MODE, ExportMode.FLATTEN);
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -333,7 +312,7 @@ public class TestNgsiLdToPostgreSQL {
     @Test
     public void currentStateSemiFlattenExport() throws IOException , SQLException{
         runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
-        runner.setProperty(EXPORT_MODE, EXPORT_SEMI_FLATTEN);
+        runner.setProperty(EXPORT_MODE, ExportMode.SEMI_FLATTEN);
         runner.enqueue(loadTestFile("entity-current.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -372,7 +351,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void notificationDefaultExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -427,7 +406,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void notificationDefaultExportIgnoredAttributesAndDatasetTruncate() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.setProperty(IGNORED_ATTRIBUTES, "servesdataset,unitcode,citation");
         runner.setProperty(DATASETID_PREFIX_TRUNCATE, "urn:ngsi-ld:");
         runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
@@ -471,7 +450,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void notificationFlattenExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_FLATTEN);
+        runner.setProperty(EXPORT_MODE, ExportMode.FLATTEN);
         runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -541,7 +520,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void notificationSemiFlattenExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_SEMI_FLATTEN);
+        runner.setProperty(EXPORT_MODE, ExportMode.SEMI_FLATTEN);
         runner.enqueue(loadTestFile("entity-notification.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -610,7 +589,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void temporalDefaultExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -658,7 +637,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void temporalDefaultExportExportSysAttrs() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.setProperty(EXPORT_SYSATTRS, "true");
         runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
 
@@ -727,7 +706,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void temporalDefaultExportIgnoredAttributes() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_EXPANDED);
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
         runner.setProperty(IGNORED_ATTRIBUTES, "servesdataset,unitcode");
         runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
 
@@ -768,7 +747,7 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void temporalFlattenExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_FLATTEN);
+        runner.setProperty(EXPORT_MODE, ExportMode.FLATTEN);
         runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
@@ -836,8 +815,8 @@ public class TestNgsiLdToPostgreSQL {
 
     @Test
     public void temporalSemiFlattenExport() throws IOException , SQLException{
-        runner.setProperty(EXPORT_MODE, EXPORT_SEMI_FLATTEN);
-        runner.enqueue(loadTestFile("entity-temporal-2.jsonld").getBytes(), Collections.emptyMap());
+        runner.setProperty(EXPORT_MODE, ExportMode.SEMI_FLATTEN);
+        runner.enqueue(loadTestFile("entity-temporal-multi-attributes.jsonld").getBytes(), Collections.emptyMap());
 
         runner.run();
         runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
