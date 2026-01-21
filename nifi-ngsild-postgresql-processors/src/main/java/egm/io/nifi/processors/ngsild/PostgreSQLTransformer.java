@@ -20,6 +20,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
@@ -29,6 +30,9 @@ import static egm.io.nifi.processors.ngsild.model.PostgreSQLConstants.POSTGRESQL
 public class PostgreSQLTransformer {
 
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLTransformer.class);
+
+    Pattern UUID_REGEX =
+        Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     public Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields(
         Entity entity,
@@ -116,10 +120,14 @@ public class PostgreSQLTransformer {
     }
 
     private String encodeAttributeToColumnName(String attributeName, String datasetId, String datasetIdPrefixToTruncate) {
+        String datasetIdWithoutPrefix = datasetId.replaceFirst(datasetIdPrefixToTruncate, "");
+        if (UUID_REGEX.matcher(datasetIdWithoutPrefix).matches())
+            datasetIdWithoutPrefix = datasetIdWithoutPrefix.substring(0, 8);
+
         // For too long dataset ids, truncate to 32 (not perfect, nor totally bulletproof)
         String datasetIdEncodedValue =
             (!datasetId.isEmpty() ?
-                "_" + PostgreSQLUtils.encodePostgreSQL(PostgreSQLUtils.truncateToSize(datasetId.replaceFirst(datasetIdPrefixToTruncate, ""), 32)) :
+                "_" + PostgreSQLUtils.encodePostgreSQL(PostgreSQLUtils.truncateToSize(datasetIdWithoutPrefix, 32)) :
                 ""
             );
         String encodedName = PostgreSQLUtils.encodePostgreSQL(attributeName) + datasetIdEncodedValue;
