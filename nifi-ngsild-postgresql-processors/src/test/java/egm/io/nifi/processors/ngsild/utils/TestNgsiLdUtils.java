@@ -97,7 +97,7 @@ public class TestNgsiLdUtils {
             attributes.stream()
                 .filter(attribute -> attribute.getAttrName().equals("wateringprogram"))
                 .toList();
-        // the entity under test has 16 waterProgram observations
+        // the entity under test has 12 waterProgram observations
         assertEquals(12, wateringPrograms.size());
         Attribute wateringProgram = wateringPrograms.getFirst();
         // each wateringProgram observation should have 2 sub-attributes: unitcode and datasetId
