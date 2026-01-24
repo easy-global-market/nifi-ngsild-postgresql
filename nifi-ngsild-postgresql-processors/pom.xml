@@ -145,13 +145,13 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.24</version> <!-- Use the latest version -->
+            <version>1.5.25</version> <!-- Use the latest version -->
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.8</version>
+            <version>42.7.9</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
