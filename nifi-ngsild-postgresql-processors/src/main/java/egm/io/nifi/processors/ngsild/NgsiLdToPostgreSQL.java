@@ -19,6 +19,7 @@ import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.LogLevel;
 import org.apache.nifi.logging.LogMessage;
+import org.apache.nifi.migration.PropertyConfiguration;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -182,6 +183,25 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(BATCH_SIZE);
         properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
         return properties;
+    }
+
+    @Override
+    public void migrateProperties(final PropertyConfiguration config) {
+        final Optional<String> flattenObsRaw = config.getRawPropertyValue("flatten-observations");
+        if (flattenObsRaw.isEmpty()) {
+            return;
+        }
+        switch (flattenObsRaw.get()) {
+            case "true":
+                config.setProperty("export-mode", ExportMode.FLATTEN.name());
+                break;
+            case "false":
+                config.setProperty("export-mode", ExportMode.EXPANDED.name());
+                break;
+            default:
+                break;
+        }
+        config.removeProperty("flatten-observations");
     }
 
     @Override
