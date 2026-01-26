@@ -3,6 +3,7 @@ package egm.io.nifi.processors.ngsild;
 import egm.io.nifi.processors.ngsild.PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES;
 import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.Event;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import egm.io.nifi.processors.ngsild.utils.NgsiLdUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -18,6 +19,7 @@ import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.LogLevel;
 import org.apache.nifi.logging.LogMessage;
+import org.apache.nifi.migration.PropertyConfiguration;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -84,14 +86,16 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
-    protected static final PropertyDescriptor FLATTEN_OBSERVATIONS = new PropertyDescriptor.Builder()
-        .name("flatten-observations")
-        .displayName("Flatten observations")
-        .description("true or false, true for exporting observed attributes in a group of generic columns.")
-        .required(false)
-        .defaultValue("false")
-        .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
-        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+    protected static final PropertyDescriptor EXPORT_MODE = new PropertyDescriptor.Builder()
+        .name("export-mode")
+        .displayName("Export mode")
+        .description("The mode used to export NGSI-LD attributes to database columns. " +
+            "Expanded: one column per attribute; " +
+            "Flatten: generic columns for all observations; " +
+            "Flatten On Multi-Instances Attributes : one column per attribute name with an associated datasetId column.")
+        .required(true)
+        .allowableValues(ExportMode.class)
+        .defaultValue(ExportMode.EXPANDED)
         .build();
     protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
         .name("ignore-empty-observed-at")
@@ -170,7 +174,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(CONNECTION_POOL);
         properties.add(DB_SCHEMA);
         properties.add(TABLE_NAME_SUFFIX);
-        properties.add(FLATTEN_OBSERVATIONS);
+        properties.add(EXPORT_MODE);
         properties.add(IGNORE_EMPTY_OBSERVED_AT);
         properties.add(REPLACE_MODE);
         properties.add(DATASETID_PREFIX_TRUNCATE);
@@ -179,6 +183,25 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         properties.add(BATCH_SIZE);
         properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
         return properties;
+    }
+
+    @Override
+    public void migrateProperties(final PropertyConfiguration config) {
+        final Optional<String> flattenObsRaw = config.getRawPropertyValue("flatten-observations");
+        if (flattenObsRaw.isEmpty()) {
+            return;
+        }
+        switch (flattenObsRaw.get()) {
+            case "true":
+                config.setProperty("export-mode", ExportMode.FLATTEN.name());
+                break;
+            case "false":
+                config.setProperty("export-mode", ExportMode.EXPANDED.name());
+                break;
+            default:
+                break;
+        }
+        config.removeProperty("flatten-observations");
     }
 
     @Override
@@ -226,10 +249,10 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             if (dbSchema == null || dbSchema.isEmpty())
                 dbSchema = DEFAULT_DB_SCHEMA;
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
-            final boolean flattenObservations = context.getProperty(FLATTEN_OBSERVATIONS).evaluateAttributeExpressions(flowFile).asBoolean();
+            final ExportMode exportMode = ExportMode.valueOf(context.getProperty(EXPORT_MODE).getValue());
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
-            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, flattenObservations, session);
+            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);
             final long creationTime = event.getCreationTime();
             try {
                 final String schemaName = postgres.buildSchemaName(dbSchema);
@@ -264,7 +287,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                             context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
                             context.getProperty(EXPORT_SYSATTRS).asBoolean(),
                             ignoreEmptyObservedAt,
-                            flattenObservations
+                            exportMode
                         );
                     getLogger().debug("Prepared insert query: {}", sql);
                     // Get or create the appropriate PreparedStatement to use.

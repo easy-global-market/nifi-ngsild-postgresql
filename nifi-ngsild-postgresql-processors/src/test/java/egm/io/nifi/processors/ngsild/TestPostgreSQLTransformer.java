@@ -2,6 +2,7 @@ package egm.io.nifi.processors.ngsild;
 
 import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import egm.io.nifi.processors.ngsild.utils.NgsiLdUtils;
 import org.json.JSONArray;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ public class TestPostgreSQLTransformer {
             Set<String> expectedListOfFields = Set.of("entityId", "entityType", "scopes", "recvTime", "someattr_urn_ngsi_ld_dataset_01", "observedat");
             assertEquals(expectedListOfFields, listOfFields.keySet());
 
-            List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, 1562561734983L, "", false, false, false);
+            List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, 1562561734983L, "", false, false, ExportMode.EXPANDED);
             assertTrue(valuesForInsert.get(0).contains("'{S_UseCase/S_Instance}'"));
     }
 
@@ -84,7 +85,7 @@ public class TestPostgreSQLTransformer {
         long creationTime = 1562561734983L;
 
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields = pgTransformer.listOfFields(entity, "", false, Collections.emptySet());
-        List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
+        List<String> valuesForInsert = pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, ExportMode.EXPANDED);
         List<String> expectedValuesForInsert = List.of("('someId','someType','2023-02-16T00:00:00Z','2019-07-08T04:55:34.983Z',12.0)");
         assertEquals(expectedValuesForInsert, valuesForInsert);
     }
@@ -101,7 +102,7 @@ public class TestPostgreSQLTransformer {
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields =
             pgTransformer.listOfFields(entity, "", false, ignoredAttributes);
         List<String> valuesForInsert =
-            pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
+            pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, ExportMode.EXPANDED);
 
         assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredattr")));
         // values for ignored attribute should not be in the values for insert
@@ -122,7 +123,7 @@ public class TestPostgreSQLTransformer {
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields =
             pgTransformer.listOfFields(entity, "", false, ignoredAttributes);
         List<String> valuesForInsert =
-            pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, false);
+            pgTransformer.getValuesForInsert(entity, listOfFields, creationTime, "", false, true, ExportMode.EXPANDED);
 
         assertTrue(listOfFields.keySet().stream().noneMatch(key -> key.contains("ignoredsubattr")));
         // values for ignored sub-attribute should not be in the values for insert
@@ -148,7 +149,7 @@ public class TestPostgreSQLTransformer {
     @Test
     public void testListOfFieldsWithFlattenedObservations() throws IOException {
         String data = loadTestFile("entity-temporal.jsonld");
-        Entity entity = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), true).get(0);
+        Entity entity = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), ExportMode.FLATTEN).get(0);
 
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> typedFields =
             pgTransformer.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
@@ -165,7 +166,7 @@ public class TestPostgreSQLTransformer {
     @CsvSource({"entity-temporal.jsonld, 4", "entity-notification.jsonld, 2"})
     public void testGetValuesForInsertWithFlattenedObservations(String filename, int expectedLines) throws IOException {
         String data = loadTestFile(filename);
-        Entity entity = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), true).get(0);
+        Entity entity = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), ExportMode.FLATTEN).get(0);
 
         Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> typedFields =
             pgTransformer.listOfFields(entity, "urn:ngsi-ld:Dataset:", false, Collections.emptySet());
@@ -176,7 +177,7 @@ public class TestPostgreSQLTransformer {
             "urn:ngsi-ld:Dataset:",
             false,
             false,
-            true);
+                ExportMode.FLATTEN);
         assertEquals(expectedLines, values.size());
     }
 }

@@ -2,6 +2,7 @@ package egm.io.nifi.processors.ngsild;
 
 import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import egm.io.nifi.processors.ngsild.model.NgsiLdConstants;
 import egm.io.nifi.processors.ngsild.model.PostgreSQLConstants;
 import egm.io.nifi.processors.ngsild.utils.*;
@@ -154,7 +155,7 @@ public class PostgreSQLTransformer {
         String datasetIdPrefixToTruncate,
         Boolean exportSysAttrs,
         Boolean ignoreEmptyObservedAt,
-        Boolean flattenObservations
+        ExportMode exportMode
     ) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         List<String> valuesForInsertList = new ArrayList<>();
@@ -182,58 +183,69 @@ public class PostgreSQLTransformer {
 
         for (String observedTimestamp : observedTimestamps) {
             Map<String, String> valuesForColumns = new TreeMap<>();
-            if (!flattenObservations) {
-                for (Attribute attribute : attributesByObservedAt.get(observedTimestamp)) {
-                    Map<String, String> attributesValues =
-                        insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
-                    valuesForColumns.putAll(attributesValues);
+
+            // 1. Handle non-temporal rows (Current State)
+            if (observedTimestamp.isEmpty()) {
+                // Non-temporal row is only created for Expanded/Semi-Flatten and if explicitly allowed
+                if (ignoreEmptyObservedAt || ExportMode.FLATTEN.equals(exportMode)) {
+                    continue;
                 }
                 for (Attribute attribute : attributesWithoutObservedAt) {
-                    Map<String, String> attributesValues =
-                        insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
-                    valuesForColumns.putAll(attributesValues);
+                    valuesForColumns.putAll(insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs));
                 }
-                List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
-                for (String s : listofEncodedName) {
-                    valuesForColumns.putIfAbsent(s, null);
-                }
-                boolean hasObservations = valuesForColumns.entrySet().stream().anyMatch(entry ->
-                    entry.getKey().endsWith("observedat") && entry.getValue() != null);
-                if (hasObservations || !ignoreEmptyObservedAt)
-                    valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
-            } else {
-                // first fill with the common attributes (the non-observed ones)
-                for (Attribute commonAttribute : attributesWithoutObservedAt) {
-                    Map<String, String> attributesValues =
-                        insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
-                    valuesForColumns.putAll(attributesValues);
-                }
-                // when flattening observations, there may have more than one row per observation date
-                List<Attribute> attributes = attributesByObservedAt.get(observedTimestamp);
-                List<Attribute> observedAttributes =
-                    attributes.stream()
-                        .filter(attribute -> Objects.equals(attribute.getAttrName(), GENERIC_MEASURE))
-                        .toList();
-                // then for each observed attribute, add a new row
-                for (Attribute observedAttribute : observedAttributes) {
-                    Map<String, String> attributesValues =
-                        insertAttributesValues(observedAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
-                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs);
-                    valuesForColumns.putAll(attributesValues);
+                finalizeAndAddRow(valuesForColumns, listOfFields, valuesForInsertList, false);
+                continue;
+            }
 
-                    List<String> listofEncodedName = new ArrayList<>(listOfFields.keySet());
-                    for (String s : listofEncodedName) {
-                        valuesForColumns.putIfAbsent(s, null);
+            // 2. Handle temporal rows (Observations)
+            // Pre-fill with attributes that don't have an observedAt (metadata, etc.)
+            for (Attribute commonAttribute : attributesWithoutObservedAt) {
+                valuesForColumns.putAll(insertAttributesValues(commonAttribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                        creationTime, datasetIdPrefixToTruncate, exportSysAttrs));
+            }
+
+            List<Attribute> observedAttributes = attributesByObservedAt.get(observedTimestamp);
+
+            if (ExportMode.EXPANDED.equals(exportMode)) {
+                // Expanded: Merge all attributes of the same timestamp into one row
+                for (Attribute attribute : observedAttributes) {
+                    valuesForColumns.putAll(insertAttributesValues(attribute, valuesForColumns, entity, oldestTimeStamp, listOfFields,
+                            creationTime, datasetIdPrefixToTruncate, exportSysAttrs));
+                }
+                finalizeAndAddRow(valuesForColumns, listOfFields, valuesForInsertList, true);
+            } else {
+                // Flatten and Semi-Flatten: One row per attribute instance
+                for (Attribute observedAttribute : observedAttributes) {
+                    if (observedAttribute.isHasSubAttrs() || Objects.equals(observedAttribute.getAttrName(), GENERIC_MEASURE)) {
+                        Map<String, String> rowValues = new TreeMap<>(valuesForColumns);
+                        rowValues.putAll(insertAttributesValues(observedAttribute, rowValues, entity, oldestTimeStamp, listOfFields,
+                                creationTime, datasetIdPrefixToTruncate, exportSysAttrs));
+                        finalizeAndAddRow(rowValues, listOfFields, valuesForInsertList, true);
                     }
-                    valuesForInsertList.add("(" + String.join(",", valuesForColumns.values()) + ")");
                 }
             }
         }
 
         return valuesForInsertList;
+    }
+
+    private void finalizeAndAddRow(
+            Map<String, String> rowValues,
+            Map<String, PostgreSQLTransformer.POSTGRESQL_COLUMN_TYPES> listOfFields,
+            List<String> valuesList,
+            boolean ignoreIfNoObservedAt
+    ) {
+        for (String fieldName : listOfFields.keySet()) {
+            rowValues.putIfAbsent(fieldName, null);
+        }
+
+        boolean hasObservations = rowValues.entrySet().stream().anyMatch(entry ->
+                entry.getKey().endsWith("observedat") && entry.getValue() != null);
+
+        if (hasObservations || !ignoreIfNoObservedAt) {
+            valuesList.add("(" + String.join(",", rowValues.values()) + ")");
+        }
     }
 
     private Map<String, String> insertAttributesValues(
@@ -408,10 +420,10 @@ public class PostgreSQLTransformer {
         String datasetIdPrefixToTruncate,
         Boolean exportSysAttrs,
         Boolean ignoreEmptyObservedAt,
-        Boolean flattenObservations
+        ExportMode exportMode
     ) {
         List<String> valuesForInsert =
-            this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, flattenObservations);
+            this.getValuesForInsert(entity, listOfFields, creationTime, datasetIdPrefixToTruncate, exportSysAttrs, ignoreEmptyObservedAt, exportMode);
 
         if (valuesForInsert.isEmpty()) {
             logger.warn("Unable to get values to insert for {}, returning fake statement", entity.entityId);

@@ -3,6 +3,7 @@ package egm.io.nifi.processors.ngsild.utils;
 import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.Event;
+import egm.io.nifi.processors.ngsild.model.ExportMode;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.stream.io.StreamUtils;
@@ -26,19 +27,19 @@ public class NgsiLdUtils {
         List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
     public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
 
-    public static Event getEventFromFlowFile(FlowFile flowFile, boolean flattenObservations, final ProcessSession session) {
+    public static Event getEventFromFlowFile(FlowFile flowFile, ExportMode exportMode, final ProcessSession session) {
 
         final byte[] buffer = new byte[(int) flowFile.getSize()];
         session.read(flowFile, in -> StreamUtils.fillBuffer(in, buffer));
         final String flowFileContent = new String(buffer, StandardCharsets.UTF_8);
 
         JSONArray content = new JSONArray(flowFileContent);
-        List<Entity> entities = parseNgsiLdEntities(content, flattenObservations);
+        List<Entity> entities = parseNgsiLdEntities(content, exportMode);
 
         return new Event(flowFile.getEntryDate(), entities);
     }
 
-    public static List<Entity> parseNgsiLdEntities(JSONArray content, boolean flattenObservations) {
+    public static List<Entity> parseNgsiLdEntities(JSONArray content, ExportMode exportMode) {
         List<Entity> entities = new ArrayList<>();
         for (int i = 0; i < content.length(); i++) {
             JSONObject temporalEntity = content.getJSONObject(i);
@@ -59,11 +60,11 @@ public class NgsiLdUtils {
                         JSONArray values = temporalEntity.getJSONArray(key);
                         for (int j = 0; j < values.length(); j++) {
                             JSONObject value = values.getJSONObject(j);
-                            Attribute attribute = parseNgsiLdAttribute(key, value, flattenObservations);
+                            Attribute attribute = parseNgsiLdAttribute(key, value, exportMode);
                             addAttributeIfValid(attributes, attribute);
                         }
                     } else if (object instanceof JSONObject) {
-                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object, flattenObservations);
+                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object, exportMode);
                         addAttributeIfValid(attributes, attribute);
                     } else {
                         logger.warn("Attribute {} has unexpected value type: {}", key, object.getClass());
@@ -101,7 +102,7 @@ public class NgsiLdUtils {
         }
     }
 
-    private static Attribute parseNgsiLdAttribute(String key, JSONObject value, boolean flattenObservations) {
+    private static Attribute parseNgsiLdAttribute(String key, JSONObject value, ExportMode exportMode) {
         // When exporting the temporal history of an entity, the value of an attribute can be an empty array - as per the specification -
         // if it has no history in the specified time range.
         // In this case, some flow file can give entity that contains attributes with only null values so attribute type can be set to null
@@ -112,6 +113,9 @@ public class NgsiLdUtils {
         String modifiedAt = value.optString("modifiedAt");
         Object attrValue;
         ArrayList<Attribute> subAttributes = new ArrayList<>();
+
+        boolean isFlatten = ExportMode.FLATTEN.equals(exportMode);
+        boolean isSemiFlatten = ExportMode.SEMI_FLATTEN.equals(exportMode);
 
         if ("Relationship".contentEquals(attrType)) {
             attrValue = value.get("object").toString();
@@ -176,11 +180,7 @@ public class NgsiLdUtils {
             }
         }
 
-        if (flattenObservations && !Objects.equals(observedAt, "")) {
-            Attribute parameterName = new Attribute(
-                "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
-            );
-            subAttributes.add(parameterName);
+        if ((isFlatten || isSemiFlatten) && !Objects.equals(observedAt, "")) {
             if (Objects.equals(datasetId, "")) {
                 datasetId = "default";
             }
@@ -188,7 +188,15 @@ public class NgsiLdUtils {
                 "datasetid", "Property", "", "", "", "", datasetId.toLowerCase(), false, null
             );
             subAttributes.add(parameterDatasetId);
-            return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
+            if (isFlatten) {
+                Attribute parameterName = new Attribute(
+                        "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
+                );
+                subAttributes.add(parameterName);
+                return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
+            } else {
+                return new Attribute(normalizeAttributeName(key), attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
+            }
         } else {
             return new Attribute(normalizeAttributeName(key), attrType, datasetId, observedAt, createdAt, modifiedAt, attrValue, !subAttributes.isEmpty(), subAttributes);
         }

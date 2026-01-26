@@ -204,15 +204,15 @@ Test Configuration:
 
 2. Configure Optional Properties
 
-   | Property                      | Description                      | Default              |
-   |-------------------------------|----------------------------------|----------------------|
-   | DB Schema                     | Target database schema           | stellio              |
-   | Table Name Suffix             | Suffix for table names           | (none)               |
-   | Flatten Observations          | Generic observation columns      | false                |
-   | Ignore Empty Observed At      | Skip records without timestamps  | true                 |
-   | Dataset id prefix to truncate | Truncate prefix from dataset ids | urn:ngsi-ld:Dataset: |
-   | Export System Attributes      | Include createdAt, modifiedAt    | false                |
-   | Ignored Attributes            | Comma-separated attribute list   | (none)               |
+   | Property                      | Description                       | Default              |
+   |-------------------------------|-----------------------------------|----------------------|
+   | DB Schema                     | Target database schema            | stellio              |
+   | Table Name Suffix             | Suffix for table names            | (none)               |
+   | Export Mode                   | Expanded, flatten or semi-flatten | false                |
+   | Ignore Empty Observed At      | Skip records without timestamps   | true                 |
+   | Dataset id prefix to truncate | Truncate prefix from dataset ids  | urn:ngsi-ld:Dataset: |
+   | Export System Attributes      | Include createdAt, modifiedAt     | false                |
+   | Ignored Attributes            | Comma-separated attribute list    | (none)               |
 
 ### Sample Flows
 
