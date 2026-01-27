@@ -94,8 +94,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             "Flatten: generic columns for all observations; " +
             "Flatten On Multi-Instances Attributes : one column per attribute name with an associated datasetId column.")
         .required(true)
-        .allowableValues(ExportMode.class)
         .defaultValue(ExportMode.EXPANDED)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .build();
     protected static final PropertyDescriptor IGNORE_EMPTY_OBSERVED_AT = new PropertyDescriptor.Builder()
         .name("ignore-empty-observed-at")
@@ -192,6 +193,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             return;
         }
         switch (flattenObsRaw.get()) {
+            case "${Export-FlattenObservations}":
+                    config.setProperty("export-mode", "${Export-ExportMode}");
+                break;
             case "true":
                 config.setProperty("export-mode", ExportMode.FLATTEN.name());
                 break;
@@ -249,7 +253,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             if (dbSchema == null || dbSchema.isEmpty())
                 dbSchema = DEFAULT_DB_SCHEMA;
             final String tableNameSuffix = context.getProperty(TABLE_NAME_SUFFIX).evaluateAttributeExpressions(flowFile).getValue();
-            final ExportMode exportMode = ExportMode.valueOf(context.getProperty(EXPORT_MODE).getValue());
+            final ExportMode exportMode = ExportMode.valueOf(context.getProperty(EXPORT_MODE).evaluateAttributeExpressions(flowFile).getValue());
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
             final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);
