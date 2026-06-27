@@ -4,7 +4,7 @@ public final class PostgreSQLConstants {
 
     // http://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
     public static final int POSTGRESQL_MAX_NAME_LEN = 63;
-    public static final String OLD_CONCATENATOR = "_";
+    public static final String NAME_SEPARATOR = "_";
 
     public static final String RECV_TIME = "recvTime";
     public static final String ENTITY_ID = "entityId";

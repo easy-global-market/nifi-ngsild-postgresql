@@ -9,24 +9,22 @@ public class PostgreSQLUtils {
     private static final Pattern ENCODEPOSTGRESQL = Pattern.compile("[^a-zA-Z0-9]");
 
     /**
-     * Encodes a string replacing all the non-alphanumeric characters by '_' (except by '-' and '.').
-     * This should be only called when building a persistence element name, such as table names, file paths, etc.
+     * Encodes a string for use as a PostgreSQL identifier by replacing all
+     * non-alphanumeric characters with '_' and lowercasing the result.
      */
     public static String encodePostgreSQL(String in) {
         return ENCODEPOSTGRESQL.matcher(in).replaceAll("_").toLowerCase();
     }
 
     public static String truncateToMaxPgSize(String in) {
-        if (in.length() > POSTGRESQL_MAX_NAME_LEN + 1)
-            return in.substring(0, POSTGRESQL_MAX_NAME_LEN);
-        else
-            return in;
+        return truncate(in, POSTGRESQL_MAX_NAME_LEN);
     }
 
     public static String truncateToSize(String in, int size) {
-        if (in.length() > size + 1)
-            return in.substring(0, size);
-        else
-            return in;
+        return truncate(in, size);
+    }
+
+    private static String truncate(String in, int limit) {
+        return in.length() > limit ? in.substring(0, limit) : in;
     }
 }

@@ -171,19 +171,19 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        final List<PropertyDescriptor> properties = new ArrayList<>();
-        properties.add(CONNECTION_POOL);
-        properties.add(DB_SCHEMA);
-        properties.add(TABLE_NAME_SUFFIX);
-        properties.add(EXPORT_MODE);
-        properties.add(IGNORE_EMPTY_OBSERVED_AT);
-        properties.add(REPLACE_MODE);
-        properties.add(DATASETID_PREFIX_TRUNCATE);
-        properties.add(EXPORT_SYSATTRS);
-        properties.add(IGNORED_ATTRIBUTES);
-        properties.add(BATCH_SIZE);
-        properties.add(RollbackOnFailure.ROLLBACK_ON_FAILURE);
-        return properties;
+        return List.of(
+            CONNECTION_POOL,
+            DB_SCHEMA,
+            TABLE_NAME_SUFFIX,
+            EXPORT_MODE,
+            IGNORE_EMPTY_OBSERVED_AT,
+            REPLACE_MODE,
+            DATASETID_PREFIX_TRUNCATE,
+            EXPORT_SYSATTRS,
+            IGNORED_ATTRIBUTES,
+            BATCH_SIZE,
+            RollbackOnFailure.ROLLBACK_ON_FAILURE
+        );
     }
 
     @Override
@@ -210,11 +210,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
 
     @Override
     public Set<Relationship> getRelationships() {
-        final Set<Relationship> rels = new HashSet<>();
-        rels.add(REL_SUCCESS);
-        rels.add(REL_RETRY);
-        rels.add(REL_FAILURE);
-        return rels;
+        return Set.of(REL_SUCCESS, REL_RETRY, REL_FAILURE);
     }
 
     /**
@@ -226,7 +222,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         if (ignoredAttributes == null)
             return Collections.emptySet();
         else
-            return Arrays.stream(ignoredAttributes.split(",")).collect(Collectors.toSet());
+            return Arrays.stream(ignoredAttributes.split("\\s*,\\s*")).collect(Collectors.toSet());
     }
 
     private static final PostgreSQLTransformer postgres = new PostgreSQLTransformer();
@@ -256,9 +252,11 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
             final ExportMode exportMode = ExportMode.valueOf(context.getProperty(EXPORT_MODE).evaluateAttributeExpressions(flowFile).getValue());
             final boolean ignoreEmptyObservedAt = context.getProperty(IGNORE_EMPTY_OBSERVED_AT).evaluateAttributeExpressions(flowFile).asBoolean();
             final boolean replaceMode = context.getProperty(REPLACE_MODE).evaluateAttributeExpressions(flowFile).asBoolean();
-            final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);
-            final long creationTime = event.getCreationTime();
+            final String datasetIdPrefixToTruncate = context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue();
+            final boolean exportSysAttrs = context.getProperty(EXPORT_SYSATTRS).asBoolean();
             try {
+                final Event event = NgsiLdUtils.getEventFromFlowFile(flowFile, exportMode, session);
+                final long creationTime = event.getCreationTime();
                 final String schemaName = postgres.buildSchemaName(dbSchema);
 
                 List<Entity> entities = event.getEntities();
@@ -270,16 +268,14 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                     Map<String, POSTGRESQL_COLUMN_TYPES> listOfFields =
                         postgres.listOfFields(
                             entity,
-                            context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                            context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                            datasetIdPrefixToTruncate,
+                            exportSysAttrs,
                             getIgnoredAttributes(context, flowFile)
                         );
 
                     ResultSet columnDataType = conn.createStatement().executeQuery(postgres.getColumnsTypes(tableName));
-                    Map<String, POSTGRESQL_COLUMN_TYPES> updatedListOfTypedFields;
-                    if (columnDataType != null)
-                        updatedListOfTypedFields = postgres.getUpdatedListOfTypedFields(columnDataType, listOfFields);
-                    else updatedListOfTypedFields = listOfFields;
+                    Map<String, POSTGRESQL_COLUMN_TYPES> updatedListOfTypedFields =
+                        postgres.getUpdatedListOfTypedFields(columnDataType, listOfFields);
 
                     final String sql =
                         postgres.insertQuery(
@@ -288,8 +284,8 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                             schemaName,
                             tableName,
                             updatedListOfTypedFields,
-                            context.getProperty(DATASETID_PREFIX_TRUNCATE).getValue(),
-                            context.getProperty(EXPORT_SYSATTRS).asBoolean(),
+                            datasetIdPrefixToTruncate,
+                            exportSysAttrs,
                             ignoreEmptyObservedAt,
                             exportMode
                         );
@@ -523,9 +519,9 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
         final Map<String, String> attributes = new HashMap<>();
         attributes.put(ERROR_MESSAGE_ATTR, exception.getMessage());
 
-        if (exception instanceof SQLException) {
-            int errorCode = ((SQLException) exception).getErrorCode();
-            String sqlState = ((SQLException) exception).getSQLState();
+        if (exception instanceof SQLException sqlException) {
+            int errorCode = sqlException.getErrorCode();
+            String sqlState = sqlException.getSQLState();
 
             if (errorCode > 0) {
                 attributes.put(ERROR_CODE_ATTR, valueOf(errorCode));
@@ -680,7 +676,7 @@ public class NgsiLdToPostgreSQL extends AbstractSessionFactoryProcessor {
                 return false;
             }
             if (obj == this) {
-                return false;
+                return true;
             }
             if (!(obj instanceof StatementFlowFileEnclosure other)) {
                 return false;

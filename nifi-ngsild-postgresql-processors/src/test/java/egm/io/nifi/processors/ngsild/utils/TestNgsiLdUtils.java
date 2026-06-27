@@ -4,6 +4,7 @@ import egm.io.nifi.processors.ngsild.model.Attribute;
 import egm.io.nifi.processors.ngsild.model.Entity;
 import egm.io.nifi.processors.ngsild.model.ExportMode;
 import org.json.JSONArray;
+import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
@@ -119,5 +121,79 @@ public class TestNgsiLdUtils {
                 attribute.getAttrName().equals("datasetid")
         ));
     }
-}
 
+    @Test
+    public void testParseEntityTypeReturnsStringTypeDirectly() {
+        JSONObject entity = new JSONObject();
+        entity.put("type", "Distribution");
+        assertEquals("Distribution", NgsiLdUtils.parseEntityTypes(entity));
+    }
+
+    @Test
+    public void testParseEntityTypeJoinsArrayTypesAlphabetically() {
+        JSONObject entity = new JSONObject();
+        JSONArray types = new JSONArray();
+        types.put("ZoneB");
+        types.put("ZoneA");
+        entity.put("type", types);
+        // sorted() → ["ZoneA", "ZoneB"] → joined with "_"
+        assertEquals("ZoneA_ZoneB", NgsiLdUtils.parseEntityTypes(entity));
+    }
+
+    @Test
+    public void testParseEntityScopesReturnsNullWhenAbsent() {
+        JSONObject entity = new JSONObject();
+        entity.put("type", "Distribution");
+        assertNull(NgsiLdUtils.parseEntityScopes(entity));
+    }
+
+    @Test
+    public void testParseEntityScopesWithStringValueReturnsSetOfOne() {
+        JSONObject entity = new JSONObject();
+        entity.put("type", "Distribution");
+        entity.put("scope", "/S_UseCase/S_Instance");
+        assertEquals(Set.of("/S_UseCase/S_Instance"), NgsiLdUtils.parseEntityScopes(entity));
+    }
+
+    @Test
+    public void testParseEntityScopesWithArrayValueReturnsFullSet() {
+        JSONObject entity = new JSONObject();
+        entity.put("type", "Distribution");
+        JSONArray scopeArray = new JSONArray();
+        scopeArray.put("/scope1");
+        scopeArray.put("/scope2");
+        entity.put("scope", scopeArray);
+        assertEquals(Set.of("/scope1", "/scope2"), NgsiLdUtils.parseEntityScopes(entity));
+    }
+
+    @Test
+    public void testRelationshipAttributeValueIsTheObjectField() {
+        String data = "[{" +
+            "\"id\": \"urn:ngsi-ld:Thing:001\"," +
+            "\"type\": \"Thing\"," +
+            "\"linkedTo\": {\"type\": \"Relationship\", \"object\": \"urn:ngsi-ld:Other:123\"}" +
+            "}]";
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), ExportMode.EXPANDED);
+        Attribute linkedTo = entities.getFirst().getEntityAttrs().stream()
+            .filter(a -> a.getAttrName().equals("linkedto"))
+            .findFirst().orElseThrow();
+        assertEquals("Relationship", linkedTo.getAttrType());
+        assertEquals("urn:ngsi-ld:Other:123", linkedTo.getAttrValue());
+    }
+
+    @Test
+    public void testJsonPropertyAttributeValueIsTheJsonField() {
+        String data = "[{" +
+            "\"id\": \"urn:ngsi-ld:Thing:001\"," +
+            "\"type\": \"Thing\"," +
+            "\"metadata\": {\"type\": \"JsonProperty\", \"json\": {\"key\": \"value\", \"num\": 42}}" +
+            "}]";
+        List<Entity> entities = NgsiLdUtils.parseNgsiLdEntities(new JSONArray(data), ExportMode.EXPANDED);
+        Attribute metadata = entities.getFirst().getEntityAttrs().stream()
+            .filter(a -> a.getAttrName().equals("metadata"))
+            .findFirst().orElseThrow();
+        assertEquals("JsonProperty", metadata.getAttrType());
+        assertInstanceOf(JSONObject.class, metadata.getAttrValue());
+        assertEquals("value", ((JSONObject) metadata.getAttrValue()).getString("key"));
+    }
+}

@@ -35,31 +35,11 @@ public class Attribute {
         this.subAttrs = subAttrs;
     }
 
-    public String getObservedAt() {
-        return observedAt;
-    }
-
-    public boolean isHasSubAttrs() {
-        return hasSubAttrs;
-    }
-
-    public List<Attribute> getSubAttrs() {
-        return subAttrs;
-    }
-
-    public String getAttrName() {
-        return attrName;
-    }
-
-    public String getAttrType() {
-        return attrType;
-    }
-
-    public Object getAttrValue() {
-        return attrValue;
-    }
-
-    public String getDatasetId() {
-        return datasetId;
-    }
+    public String getAttrName() { return attrName; }
+    public String getAttrType() { return attrType; }
+    public Object getAttrValue() { return attrValue; }
+    public String getDatasetId() { return datasetId; }
+    public String getObservedAt() { return observedAt; }
+    public boolean hasSubAttrs() { return hasSubAttrs; }
+    public List<Attribute> getSubAttrs() { return subAttrs; }
 }
