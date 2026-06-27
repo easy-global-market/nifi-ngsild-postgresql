@@ -26,7 +26,7 @@ import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.ERROR_MESSAGE_ATT
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.IGNORE_EMPTY_OBSERVED_AT;
 import static egm.io.nifi.processors.ngsild.NgsiLdToPostgreSQL.TABLE_NAME_SUFFIX;
 import static egm.io.nifi.processors.ngsild.utils.TestUtils.printTableContent;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 public class TestNgsiLdToPostgreSQL {
@@ -850,6 +850,33 @@ public class TestNgsiLdToPostgreSQL {
     }
 
     @Test
+    public void itShouldAddNewColumnsWhenEntityGainsANewAttribute() throws IOException, SQLException {
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
+        runner.setProperty(IGNORED_ATTRIBUTES, "stationcode");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+        runner.run();
+        runner.assertTransferCount(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            ResultSet cols = connection.getMetaData().getColumns(null, "public", "distribution", "stationcode");
+            assertFalse(cols.next(), "stationcode column should not exist after first run with ignored attributes");
+        }
+
+        // Second run without the ignored attribute — should trigger ALTER TABLE ADD COLUMN for stationcode
+        runner.removeProperty(IGNORED_ATTRIBUTES);
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+        runner.run();
+        runner.assertTransferCount(NgsiLdToPostgreSQL.REL_SUCCESS, 2);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            ResultSet cols = connection.getMetaData().getColumns(null, "public", "distribution", "stationcode");
+            assertTrue(cols.next(), "stationcode column should exist after second run (ALTER TABLE ADD COLUMN)");
+        } finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
     public void itShouldRouteToFailureAndAddErrorAttributeIfSchemNameIsTooLong() throws IOException {
         runner.setProperty(
             DB_SCHEMA,
@@ -924,6 +951,110 @@ public class TestNgsiLdToPostgreSQL {
                 "Building table name 'shellfishtable_tooloooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongsuffix' and its length is greater than 63"
             )
         );
+    }
+
+    @Test
+    public void nonPointGeoPropertyOmitsLonLatColumns() throws IOException, SQLException {
+        runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.setProperty(EXPORT_MODE, ExportMode.EXPANDED);
+        runner.enqueue(loadTestFile("entity-polygon-geoproperty.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            checkRowCount(connection, "public", "zone", 1);
+
+            // Polygon → no lon/lat columns
+            ResultSet lonCol = connection.getMetaData().getColumns(null, "public", "zone", "area_lon");
+            assertFalse(lonCol.next(), "area_lon should not exist for a Polygon GeoProperty");
+            ResultSet latCol = connection.getMetaData().getColumns(null, "public", "zone", "area_lat");
+            assertFalse(latCol.next(), "area_lat should not exist for a Polygon GeoProperty");
+
+            // geometry and geojson columns are always created
+            ResultSet geomCol = connection.getMetaData().getColumns(null, "public", "zone", "area_geometry");
+            assertTrue(geomCol.next(), "area_geometry should exist");
+            ResultSet geoJsonCol = connection.getMetaData().getColumns(null, "public", "zone", "area_geojson");
+            assertTrue(geoJsonCol.next(), "area_geojson should exist");
+        } finally {
+            dropTable("public", "zone");
+        }
+    }
+
+    @Test
+    public void itShouldRouteToFailureForMalformedJson() {
+        runner.enqueue("not valid json at all".getBytes(), Collections.emptyMap());
+        runner.run();
+        runner.assertAllFlowFilesTransferred(REL_FAILURE, 1);
+        runner.assertAllConditionsMet(REL_FAILURE, mff -> {
+            mff.assertAttributeExists(ERROR_MESSAGE_ATTR);
+            return true;
+        });
+    }
+
+    @Test
+    public void itShouldNotRouteAnyFlowFileForEmptyJsonArray() {
+        runner.setProperty(IGNORE_EMPTY_OBSERVED_AT, "false");
+        runner.enqueue("[]".getBytes(), Collections.emptyMap());
+        runner.run();
+        // Empty array → no entities to process → FlowFile is never explicitly routed
+        runner.assertTransferCount(REL_SUCCESS, 0);
+        runner.assertTransferCount(REL_FAILURE, 0);
+        runner.assertTransferCount(REL_RETRY, 0);
+    }
+
+    @Test
+    public void temporalFlattenExportWithSysAttrs() throws IOException, SQLException {
+        runner.setProperty(EXPORT_MODE, ExportMode.FLATTEN);
+        runner.setProperty(EXPORT_SYSATTRS, "true");
+        runner.enqueue(loadTestFile("entity-temporal.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            checkRowCount(connection, "public", "distribution", 4);
+
+            // Static attributes (no observedAt) get sysattr columns
+            ResultSet stationCodeCreatedAt = connection.getMetaData().getColumns(null, "public", "distribution", "stationcode_createdat");
+            assertTrue(stationCodeCreatedAt.next(), "stationcode_createdat should exist for static attribute with sysattrs");
+            ResultSet stationCodeModifiedAt = connection.getMetaData().getColumns(null, "public", "distribution", "stationcode_modifiedat");
+            assertTrue(stationCodeModifiedAt.next(), "stationcode_modifiedat should exist for static attribute with sysattrs");
+
+            // GENERIC_MEASURE attributes (temporal, have observedAt) must NOT get sysattr columns
+            ResultSet measureCreatedAt = connection.getMetaData().getColumns(null, "public", "distribution", "measure_createdat");
+            assertFalse(measureCreatedAt.next(), "measure_createdat must not exist: temporal attributes get observedat, not sysattrs");
+            ResultSet measureModifiedAt = connection.getMetaData().getColumns(null, "public", "distribution", "measure_modifiedat");
+            assertFalse(measureModifiedAt.next(), "measure_modifiedat must not exist for temporal GENERIC_MEASURE attributes");
+        } finally {
+            dropTable("public", "distribution");
+        }
+    }
+
+    @Test
+    public void temporalSemiFlattenExportWithSysAttrs() throws IOException, SQLException {
+        runner.setProperty(EXPORT_MODE, ExportMode.SEMI_FLATTEN);
+        runner.setProperty(EXPORT_SYSATTRS, "true");
+        runner.enqueue(loadTestFile("entity-temporal-multi-attributes.jsonld").getBytes(), Collections.emptyMap());
+
+        runner.run();
+        runner.assertAllFlowFilesTransferred(NgsiLdToPostgreSQL.REL_SUCCESS, 1);
+
+        try (final Connection connection = postgreSQLContainer.createConnection("")) {
+            checkRowCount(connection, "public", "distribution", 14);
+
+            // Static attributes (no observedAt) get sysattr columns
+            ResultSet nameCreatedAt = connection.getMetaData().getColumns(null, "public", "distribution", "name_createdat");
+            assertTrue(nameCreatedAt.next(), "name_createdat should exist for static attribute with sysattrs");
+
+            // Temporal attributes (have observedAt) must NOT get sysattr columns
+            ResultSet wateringCreatedAt = connection.getMetaData().getColumns(null, "public", "distribution", "wateringprogram_createdat");
+            assertFalse(wateringCreatedAt.next(), "wateringprogram_createdat must not exist: temporal attributes get observedat, not sysattrs");
+            ResultSet simpleCreatedAt = connection.getMetaData().getColumns(null, "public", "distribution", "simpleattribute_createdat");
+            assertFalse(simpleCreatedAt.next(), "simpleattribute_createdat must not exist for temporal attributes");
+        } finally {
+            dropTable("public", "distribution");
+        }
     }
 
     private String loadTestFile(String filename) throws IOException {
