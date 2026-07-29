@@ -16,16 +16,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.DEFAULT_CORE_CONTEXT_PREFIX;
-import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.GENERIC_MEASURE;
+import static egm.io.nifi.processors.ngsild.model.NgsiLdConstants.*;
 
 public class NgsiLdUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(NgsiLdUtils.class);
 
-    public static List<String> IGNORED_KEYS_ON_ATTRIBUTES =
+    private static final List<String> IGNORED_KEYS_ON_ATTRIBUTES =
         List.of("type", "value", "object", "json", "datasetId", "createdAt", "modifiedAt", "instanceId", "observedAt");
-    public static List<String> IGNORED_KEYS_ON_ENTITES = List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
+    private static final List<String> IGNORED_KEYS_ON_ENTITIES =
+        List.of("id", "type", "scope", "@context", "createdAt", "modifiedAt");
 
     public static Event getEventFromFlowFile(FlowFile flowFile, ExportMode exportMode, final ProcessSession session) {
 
@@ -52,23 +52,11 @@ public class NgsiLdUtils {
             Iterator<String> keys = temporalEntity.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
-                if (!IGNORED_KEYS_ON_ENTITES.contains(key)) {
-                    Object object = temporalEntity.get(key);
-                    if (object instanceof JSONArray) {
-                        // it is a multi-attribute (see section 4.5.5 in NGSI-LD specification)
-                        // or an attribute with a temporal evolution
-                        JSONArray values = temporalEntity.getJSONArray(key);
-                        for (int j = 0; j < values.length(); j++) {
-                            JSONObject value = values.getJSONObject(j);
-                            Attribute attribute = parseNgsiLdAttribute(key, value, exportMode);
-                            addAttributeIfValid(attributes, attribute);
-                        }
-                    } else if (object instanceof JSONObject) {
-                        Attribute attribute = parseNgsiLdAttribute(key, (JSONObject) object, exportMode);
+                if (!IGNORED_KEYS_ON_ENTITIES.contains(key)) {
+                    forEachAttributeValue(temporalEntity.get(key), key, (attrKey, attrValue) -> {
+                        Attribute attribute = parseNgsiLdAttribute(attrKey, attrValue, exportMode);
                         addAttributeIfValid(attributes, attribute);
-                    } else {
-                        logger.warn("Attribute {} has unexpected value type: {}", key, object.getClass());
-                    }
+                    });
                 }
             }
 
@@ -117,15 +105,15 @@ public class NgsiLdUtils {
         boolean isFlatten = ExportMode.FLATTEN.equals(exportMode);
         boolean isSemiFlatten = ExportMode.SEMI_FLATTEN.equals(exportMode);
 
-        if ("Relationship".contentEquals(attrType)) {
+        if (ATTR_TYPE_RELATIONSHIP.equals(attrType)) {
             attrValue = value.get("object").toString();
-        } else if ("Property".contentEquals(attrType)) {
+        } else if (ATTR_TYPE_PROPERTY.equals(attrType)) {
             attrValue = value.opt("value");
-        } else if ("GeoProperty".contentEquals(attrType)) {
+        } else if (ATTR_TYPE_GEO_PROPERTY.equals(attrType)) {
             attrValue = value;
-        } else if ("JsonProperty".contentEquals(attrType)) {
+        } else if (ATTR_TYPE_JSON_PROPERTY.equals(attrType)) {
             attrValue = value.getJSONObject("json");
-        } else if ("".contentEquals(attrType)) {
+        } else if ("".equals(attrType)) {
             attrType = null;
             attrValue = null;
         } else {
@@ -136,61 +124,40 @@ public class NgsiLdUtils {
         Iterator<String> keysOneLevel = value.keys();
         while (keysOneLevel.hasNext()) {
             String keyOne = keysOneLevel.next();
-            if (("Property".equals(attrType) && "unitCode".equals(keyOne))) {
+            if (ATTR_TYPE_PROPERTY.equals(attrType) && "unitCode".equals(keyOne)) {
                 if (value.get(keyOne) instanceof String)
-                    subAttributes.add(new Attribute(keyOne.toLowerCase(), "Property", "", "", "", "", value.getString(keyOne), false, null));
-            } else if ("entity".contains(keyOne) || "RelationshipDetails".contains(keyOne)) {
+                    subAttributes.add(new Attribute(keyOne.toLowerCase(), ATTR_TYPE_PROPERTY, "", "", "", "", value.getString(keyOne), false, null));
+            } else if (keyOne.equals("entity") || keyOne.equals("RelationshipDetails")) {
                 JSONObject relation = value.getJSONObject(keyOne);
                 relation.remove("id");
                 relation.remove("type");
                 relation.remove("scope");
 
                 for (String relationKey : relation.keySet()) {
-                    Object object = relation.get(relationKey);
-                    if (object instanceof JSONArray) {
-                        // it is a multi-attribute (see section 4.5.5 in NGSI-LD specification)
-                        JSONArray valuesArray = relation.getJSONArray(relationKey);
-                        for (int j = 0; j < valuesArray.length(); j++) {
-                            JSONObject valueObject = valuesArray.getJSONObject(j);
-                            Attribute subAttribute = parseNgsiLdSubAttribute(relationKey, valueObject);
-                            addAttributeIfValid(subAttributes, subAttribute);
-                        }
-                    } else if (object instanceof JSONObject) {
-                        Attribute subAttribute = parseNgsiLdSubAttribute(relationKey, (JSONObject) object);
+                    forEachAttributeValue(relation.get(relationKey), relationKey, (rKey, rValue) -> {
+                        Attribute subAttribute = parseNgsiLdSubAttribute(rKey, rValue);
                         addAttributeIfValid(subAttributes, subAttribute);
-                    } else {
-                        logger.warn("Sub Attribute {} has unexpected value type: {}", relationKey, object.getClass());
-                    }
+                    });
                 }
             } else if (!IGNORED_KEYS_ON_ATTRIBUTES.contains(keyOne)) {
-                Object object = value.get(keyOne);
-                if (object instanceof JSONArray) {
-                    JSONArray valuesArray = value.getJSONArray(keyOne);
-                    for (int j = 0; j < valuesArray.length(); j++) {
-                        JSONObject valueObject = valuesArray.getJSONObject(j);
-                        Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, valueObject);
-                        addAttributeIfValid(subAttributes, subAttribute);
-                    }
-                } else if (object instanceof JSONObject) {
-                    Attribute subAttribute = parseNgsiLdSubAttribute(keyOne, value.getJSONObject(keyOne));
+                forEachAttributeValue(value.get(keyOne), keyOne, (subKey, subValue) -> {
+                    Attribute subAttribute = parseNgsiLdSubAttribute(subKey, subValue);
                     addAttributeIfValid(subAttributes, subAttribute);
-                } else {
-                    logger.warn("Sub Attribute {} has unexpected value type: {}", keyOne, object.getClass());
-                }
+                });
             }
         }
 
-        if ((isFlatten || isSemiFlatten) && !Objects.equals(observedAt, "")) {
-            if (Objects.equals(datasetId, "")) {
+        if ((isFlatten || isSemiFlatten) && !observedAt.isEmpty()) {
+            if (datasetId.isEmpty()) {
                 datasetId = "default";
             }
             Attribute parameterDatasetId = new Attribute(
-                "datasetid", "Property", "", "", "", "", datasetId.toLowerCase(), false, null
+                "datasetid", ATTR_TYPE_PROPERTY, "", "", "", "", datasetId.toLowerCase(), false, null
             );
             subAttributes.add(parameterDatasetId);
             if (isFlatten) {
                 Attribute parameterName = new Attribute(
-                        "parametername", "Property", "", "", "", "", key.toLowerCase(), false, null
+                    "parametername", ATTR_TYPE_PROPERTY, "", "", "", "", key.toLowerCase(), false, null
                 );
                 subAttributes.add(parameterName);
                 return new Attribute(GENERIC_MEASURE, attrType, "", observedAt, createdAt, modifiedAt, attrValue, true, subAttributes);
@@ -205,17 +172,34 @@ public class NgsiLdUtils {
     private static Attribute parseNgsiLdSubAttribute(String key, JSONObject value) {
         String subAttrType = value.get("type").toString();
         Object subAttrValue = "";
-        if ("Relationship".contentEquals(subAttrType)) {
+        if (ATTR_TYPE_RELATIONSHIP.equals(subAttrType)) {
             subAttrValue = value.get("object").toString();
-        } else if ("Property".contentEquals(subAttrType)) {
+        } else if (ATTR_TYPE_PROPERTY.equals(subAttrType)) {
             subAttrValue = value.get("value");
-        } else if ("GeoProperty".contentEquals(subAttrType)) {
+        } else if (ATTR_TYPE_GEO_PROPERTY.equals(subAttrType)) {
             subAttrValue = value.get("value").toString();
-        } else if ("JsonProperty".contentEquals(subAttrType)) {
+        } else if (ATTR_TYPE_JSON_PROPERTY.equals(subAttrType)) {
             subAttrValue = value.get("json").toString();
         }
 
         return new Attribute(normalizeAttributeName(key), subAttrType, "", "", "", "", subAttrValue, false, null);
+    }
+
+    @FunctionalInterface
+    private interface AttributeValueConsumer {
+        void accept(String key, JSONObject value);
+    }
+
+    private static void forEachAttributeValue(Object node, String key, AttributeValueConsumer consumer) {
+        if (node instanceof JSONArray array) {
+            for (int j = 0; j < array.length(); j++) {
+                consumer.accept(key, array.getJSONObject(j));
+            }
+        } else if (node instanceof JSONObject obj) {
+            consumer.accept(key, obj);
+        } else {
+            logger.warn("Attribute {} has unexpected value type: {}", key, node.getClass());
+        }
     }
 
     // When this processor is used in a flow with a `Join Enrichment` processor, it harmonizes JSON among all processed entities,

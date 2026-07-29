@@ -1,0 +1,17 @@
+[
+  {
+    "id": "urn:ngsi-ld:Zone:001",
+    "type": "Zone",
+    "name": {
+      "type": "Property",
+      "value": "Test Zone"
+    },
+    "area": {
+      "type": "GeoProperty",
+      "value": {
+        "type": "Polygon",
+        "coordinates": [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]]]
+      }
+    }
+  }
+]
